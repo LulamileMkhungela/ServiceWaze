@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<meta name="description" content="ServiceWaze — live status for electricity, water, weather, transport and news for your area. Free, low-data, no login.">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/icons/icon-180.png">
+<title>ServiceWaze — Live service status & news for your area</title>
+<style>
+  :root{--bg:#0d1117;--card:#161c26;--card2:#1c2431;--line:#2a3444;--text:#e6edf3;--muted:#9aa7b8;
+    --accent:#38bdf8;--ok:#34d399;--warn:#fbbf24;--severe:#f87171;--info:#a78bfa;--nav:#10151d;}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45;}
+  .wrap{max-width:820px;margin:0 auto;padding:10px 12px 96px;}
+  /* header */
+  header{position:sticky;top:0;z-index:20;background:rgba(13,17,23,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);padding:8px 12px;margin:-10px -12px 10px;}
+  .head{display:flex;align-items:center;gap:8px;max-width:820px;margin:0 auto;}
+  .logo{font-size:1.2rem;font-weight:800;letter-spacing:.2px;white-space:nowrap;}
+  .logo .dot{color:var(--accent);}
+  .pill{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:.74rem;font-weight:700;
+    border-radius:999px;padding:4px 10px;border:1px solid var(--line);background:var(--card2);white-space:nowrap;}
+  .pill .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  .dot.green{background:var(--ok);} .dot.amber{background:var(--warn);} .dot.red{background:var(--severe);}
+  .dot.gray{background:#6b7280;}
+  #offlineDot{display:none;width:8px;height:8px;border-radius:50%;background:#f87171;box-shadow:0 0 6px #f87171;}
+  .langs{display:flex;gap:3px;margin-left:6px;}
+  .langs button{background:var(--card2);color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:3px 7px;font-size:.68rem;cursor:pointer;}
+  .langs button.active{background:var(--accent);color:#062033;border-color:var(--accent);font-weight:800;}
+  /* areas bar */
+  .areas{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:none;}
+  .areas::-webkit-scrollbar{display:none;}
+  .chip{flex:0 0 auto;display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);
+    color:var(--text);border-radius:999px;padding:7px 14px;font-size:.85rem;cursor:pointer;max-width:220px;}
+  .chip.active{background:var(--accent);color:#062033;border-color:var(--accent);font-weight:700;}
+  .chip .x{opacity:.6;font-size:.95rem;}
+  .chip.add{color:var(--accent);border-style:dashed;}
+  /* cards */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;}
+  .card h2{font-size:1rem;display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:700;white-space:nowrap;}
+  .badge.ok{background:rgba(52,211,153,.15);color:var(--ok);}
+  .badge.warn{background:rgba(251,191,36,.15);color:var(--warn);}
+  .badge.severe{background:rgba(248,113,113,.15);color:var(--severe);}
+  .badge.info{background:rgba(167,139,250,.15);color:var(--info);}
+  .badge.neutral{background:rgba(154,167,184,.15);color:var(--muted);}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:.88rem;}
+  .row .k{color:var(--muted);}
+  .note{color:var(--muted);font-size:.76rem;margin-top:8px;}
+  .btn{background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:10px;
+    padding:9px 14px;font-size:.85rem;cursor:pointer;font-weight:600;}
+  .btn.primary{background:var(--accent);color:#062033;border:none;font-weight:800;}
+  .btn.warn{border-color:rgba(251,191,36,.5);color:var(--warn);}
+  .btn.sm{padding:6px 10px;font-size:.78rem;}
+  .btn:active{transform:scale(.98);}
+  .hero{background:linear-gradient(160deg,#12202e,#101623);border:1px solid var(--line);border-radius:16px;
+    padding:16px;margin-bottom:12px;}
+  .hero .top{display:flex;align-items:flex-start;gap:10px;}
+  .hero .big{font-size:2.6rem;font-weight:800;line-height:1;}
+  .hero .desc{font-size:.92rem;color:var(--muted);margin-top:2px;}
+  .hero .side{margin-left:auto;text-align:right;font-size:.8rem;color:var(--muted);}
+  .hero .mini{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .mini .m{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:.76rem;text-align:center;}
+  .adv{display:flex;gap:8px;margin-top:10px;flex-direction:column;}
+  .chipadv{border-radius:10px;padding:9px 11px;font-size:.8rem;display:flex;gap:8px;align-items:flex-start;}
+  .chipadv.severe{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.4);}
+  .chipadv.warn{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.35);}
+  /* reports */
+  .report{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;}
+  .report .meta{display:flex;justify-content:space-between;gap:6px;font-size:.7rem;color:var(--muted);margin-bottom:4px;flex-wrap:wrap;}
+  .report .msg{font-size:.85rem;}
+  .repkind{font-weight:700;}
+  .repkind.no_water{color:var(--severe);}.repkind.low_pressure{color:var(--warn);}.repkind.leak{color:var(--warn);}
+  .repkind.restored{color:var(--ok);}.repkind.power_out{color:var(--warn);}.repkind.route{color:var(--info);}
+  /* links */
+  .links a{color:var(--accent);display:flex;align-items:center;gap:6px;padding:6px 0;font-size:.86rem;text-decoration:none;border-bottom:1px solid rgba(42,52,68,.5);}
+  .links a:last-child{border-bottom:none;}
+  .links a small{color:var(--muted);display:block;font-size:.72rem;}
+  /* news */
+  .filterbar{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none;}
+  .filterbar::-webkit-scrollbar{display:none;}
+  .fchip{flex:0 0 auto;background:var(--card2);border:1px solid var(--line);color:var(--muted);border-radius:999px;
+    padding:6px 12px;font-size:.78rem;cursor:pointer;font-weight:600;}
+  .fchip.active{background:var(--accent);color:#062033;border-color:var(--accent);}
+  .news{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;}
+  .news .top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+  .news h3{font-size:.95rem;margin-bottom:6px;}
+  .news a{color:var(--text);text-decoration:none;}
+  .news p{color:var(--muted);font-size:.8rem;}
+  .src{font-size:.7rem;color:var(--muted);}
+  .areaTag{font-size:.66rem;background:rgba(56,189,248,.15);color:var(--accent);border-radius:6px;padding:2px 6px;}
+  /* tabs */
+  .nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--nav);border-top:1px solid var(--line);
+    display:flex;max-width:820px;margin:0 auto;}
+  .nav button{flex:1;background:none;border:none;color:var(--muted);padding:10px 4px 12px;font-size:.68rem;cursor:pointer;font-weight:700;}
+  .nav button .ic{font-size:1.3rem;display:block;margin-bottom:2px;}
+  .nav button.active{color:var(--accent);}
+  .fab{position:fixed;right:18px;bottom:78px;z-index:31;width:58px;height:58px;border-radius:50%;border:none;
+    background:var(--accent);color:#062033;font-size:1.9rem;font-weight:800;box-shadow:0 6px 18px rgba(56,189,248,.35);cursor:pointer;}
+  .fab:active{transform:scale(.94);}
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;justify-content:center;z-index:50;}
+  .overlay.open{display:flex;}
+  .sheet{background:var(--card);border:1px solid var(--line);border-radius:16px 16px 0 0;width:100%;max-width:820px;padding:18px 16px 28px;max-height:88vh;overflow:auto;}
+  .sheet h3{margin-bottom:10px;}
+  .kinds{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
+  .kinds button{border:1px solid var(--line);background:var(--card2);color:var(--text);border-radius:999px;padding:8px 13px;font-size:.8rem;cursor:pointer;}
+  .kinds button.active{border-color:var(--accent);color:var(--accent);}
+  .sheet input,.sheet textarea,.sheet select{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--text);
+    border-radius:10px;padding:11px 12px;font-size:.95rem;margin:6px 0;font-family:inherit;}
+  .sheet .actions{display:flex;gap:8px;margin-top:12px;}
+  .sheet .actions button{flex:1;padding:13px;border-radius:10px;font-size:.95rem;font-weight:800;cursor:pointer;}
+  #go{background:var(--accent);color:#062033;border:none;}
+  #cancel{background:var(--card2);color:var(--text);border:1px solid var(--line);}
+  .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#111827;color:var(--text);
+    border:1px solid var(--line);padding:11px 18px;border-radius:12px;font-size:.85rem;display:none;z-index:60;
+    max-width:90vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .loading{color:var(--muted);text-align:center;padding:50px 20px;}
+  .switch{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(42,52,68,.5);font-size:.88rem;}
+  .switch:last-child{border-bottom:none;}
+  .switch input{width:44px;height:24px;appearance:none;background:var(--card2);border:1px solid var(--line);border-radius:999px;position:relative;cursor:pointer;transition:.2s;}
+  .switch input:checked{background:var(--accent);border-color:var(--accent);}
+  .switch input:before{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s;}
+  .switch input:checked:before{left:22px;}
+  .listrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(42,52,68,.5);}
+  .listrow:last-child{border-bottom:none;}
+  .listrow .grow{flex:1;min-width:0;}
+  .empty{color:var(--muted);font-size:.85rem;text-align:center;padding:24px 10px;}
+  .footer{color:var(--muted);font-size:.72rem;margin-top:16px;border-top:1px solid var(--line);padding-top:12px;}
+  .footer a{color:var(--accent);}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);}
+  .section{display:none;} .section.active{display:block;}
+  .checklist{background:var(--card2);border:1px solid var(--line);border-radius:10px;margin-top:8px;padding:10px 12px;}
+  .checklist ol{padding-left:18px;font-size:.83rem;color:var(--muted);}
+  .checklist li{margin:5px 0;}
+  .checklist summary{font-weight:700;font-size:.87rem;cursor:pointer;color:var(--text);}
+  .searchrow{display:flex;gap:8px;margin-bottom:10px;}
+  .searchrow input{flex:1;background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:11px 13px;font-size:.95rem;}
+  .searchrow input:focus{outline:2px solid var(--accent);}
+  .suggest{list-style:none;background:var(--card);border:1px solid var(--line);border-radius:10px;margin:4px 0 10px;max-height:230px;overflow:auto;}
+  .suggest li{padding:11px 14px;border-bottom:1px solid var(--line);cursor:pointer;font-size:.88rem;}
+  .suggest li:last-child{border-bottom:none;}
+  .suggest li small{color:var(--muted);display:block;}
+  .aqi{display:inline-flex;align-items:center;gap:5px;}
+  .hint{font-size:.74rem;color:var(--muted);margin-top:4px;}
+  .photo{max-width:100%;border-radius:8px;margin-top:6px;border:1px solid var(--line);}
+</style>
+</head>
+<body>
+<a class="sr" href="#main">Skip to content</a>
+<header>
+  <div class="head">
+    <div class="logo">Service<span class="dot">Waze</span></div>
+    <span id="offlineDot" title="Offline — showing last data"></span>
+    <span class="pill" id="npill"><span class="dot gray" id="ndot"></span><span id="nlabel">…</span></span>
+    <div class="langs">
+      <button data-lang="en" class="active">EN</button><button data-lang="zu">ZU</button>
+      <button data-lang="xh">XH</button><button data-lang="st">ST</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- AREA CHIPS -->
+  <div class="areas" id="areasBar"></div>
+
+  <!-- SEARCH MODAL TRIGGER (hidden input used by add-area modal) -->
+  <div id="main">
+    <section id="sec-home" class="section active"></section>
+    <section id="sec-services" class="section"></section>
+    <section id="sec-news" class="section"></section>
+    <section id="sec-alerts" class="section"></section>
+    <section id="sec-more" class="section"></section>
+  </div>
+
+  <div class="footer">
+    <p data-i18n="foot1">ServiceWaze pulls live data from Eskom, Open-Meteo (weather & air quality), Google News SA, The Citizen, BusinessTech and Mastodon — merged into one feed. Community reports are user-verified. Always confirm critical information with official channels (links provided). No login needed; your areas and settings stay on your phone.</p>
+    <p style="margin-top:6px"><a href="/api/status?q=Soweto">JSON API</a> · <a href="/docs">API docs</a> · <a href="https://www.johannesburgwater.co.za">Joburg Water</a> · <a href="https://www.randwater.co.za">Rand Water</a> · <a href="https://www.weathersa.co.za">SAWS</a></p>
+  </div>
+</div>
+
+<!-- bottom nav -->
+<nav class="nav" id="nav">
+  <button data-tab="home" class="active"><span class="ic">🏠</span><span data-i18n="tHome">Home</span></button>
+  <button data-tab="services"><span class="ic">🧰</span><span data-i18n="tSvc">Services</span></button>
+  <button data-tab="news"><span class="ic">📰</span><span data-i18n="tNews">News</span></button>
+  <button data-tab="alerts"><span class="ic">🔔</span><span data-i18n="tAlerts">Alerts</span></button>
+  <button data-tab="more"><span class="ic">⚙️</span><span data-i18n="tMore">More</span></button>
+</nav>
+<button class="fab" id="fab" title="Report an issue">＋</button>
+
+<!-- REPORT MODAL -->
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <h3 data-i18n="repT">Report something we missed</h3>
+    <input id="rArea" placeholder="Area / suburb" data-i18n="repArea">
+    <div class="kinds" id="kinds"></div>
+    <input id="rMsg" placeholder="What's happening? e.g. no water since 6am" data-i18n="repMsg">
+    <input id="rName" placeholder="Your name (optional)" data-i18n="repName">
+    <label class="hint" data-i18n="photoHint">📷 Add a photo (optional, under 300KB)</label>
+    <input type="file" id="rPhoto" accept="image/*" style="display:none">
+    <button class="btn sm" id="photoBtn" data-i18n="attach">Attach photo</button>
+    <div class="actions">
+      <button id="cancel" data-i18n="cancel">Cancel</button>
+      <button id="go" data-i18n="send">Send report</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD AREA MODAL -->
+<div class="overlay" id="addOverlay">
+  <div class="sheet">
+    <h3 data-i18n="addArea">Add a location to watch</h3>
+    <div class="searchrow">
+      <input id="addQ" placeholder="Search suburb / town…" data-i18n="ph">
+      <button class="btn" id="addGeo">📍</button>
+    </div>
+    <ul class="suggest" id="addSuggest"></ul>
+    <div class="actions">
+      <button id="addCancel" data-i18n="cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= BOOT / STATIC MODE ================= */
+const STATIC = true;
+const BOOT = {"feed": {"items": [{"areas": ["south africa"], "body": "Cold snap grips South Africa as snow and floods trigger multiple weather warnings thestar.co.za", "category": "weather", "id": "8bbd5919d75e", "source": "thestar.co.za", "time": "Wed, 29 Jul 2026 23:40:21 GMT", "title": "Cold snap grips South Africa as snow and floods trigger multiple weather warnings", "type": "news", "url": "https://news.google.com/rss/articles/CBMizwFBVV95cUxOcUtUMzAyaW9ISnVJNDBXTE5ZeG1iNE1XNDVQdndrWnVXc0lyUmFVRGp6NjdCOFpDN0t1YzFqcGNHS1Z6QUgyVU9JZmJTUmNMX3lIZUtSeWppRjZpSHBCZmsxQUxjaVpHOEtnVUNidDRFQm1STnlLQlhkSkhWZXl3VDg3ek5kb2lpcnZsVmMxOW5LM1BYWDRrN3ZOdGU3LUdvaTBGNEMxc0lHd2dqb2xkbE5VaVRmZEpZVms1U3ctalRQRFNGZ2VIckZWeXdJNEU?oc=5"}, {"areas": ["kwa-zulu natal", "south africa"], "body": "South Africa N3 snow: SA Siboniso Duma and weather authorities issue warning on KZN snowfall and heavy rain - which regions go dey affected BBC", "category": "weather", "id": "d1caf610d1e4", "source": "BBC", "time": "Wed, 29 Jul 2026 14:20:41 GMT", "title": "South Africa N3 snow: SA Siboniso Duma and weather authorities issue warning on KZN snowfall and heavy rain - which regions go dey affected", "type": "news", "url": "https://news.google.com/rss/articles/CBMiXEFVX3lxTFBwQm1IT0hpazdDdFQwS1c2MkR1MGdlZ2NBRzhyUWwwYjBJelRzNC14RE1QVFVLd2ZvbDQ3dEltNkl4ZGFEc3pFZEJ0djNKUXF0OGlmRVpFOGxUQnZI0gFiQVVfeXFMTnY1QjYwOE1yQzRkbGdmcnljQmNIM3NGcmFPQllfMjFHWGxaQlRUM2pwUWdhUlFlbjRlRmdMZXk1RU1XQjgyckRmRTlUTGlTWUVPUmFOZ2tOT3lCc29xLUFyMUE?oc=5"}, {"areas": ["western cape", "south africa"], "body": "Dyantyi appointed to lead SAPS in the Western Cape South African Government News Agency", "category": "safety", "id": "53a60fb563c3", "source": "South African Government News Agency", "time": "Wed, 29 Jul 2026 11:18:23 GMT", "title": "Dyantyi appointed to lead SAPS in the Western Cape", "type": "news", "url": "https://news.google.com/rss/articles/CBMihgFBVV95cUxQbnVqODN5Vlg0RFczTFF3NlF0U0U2NGllRFd6YlZETDNxWm9HRjVSemhWM1cwOUVQQURwX0Nia2Fadk0wUmRLRFNzUzItOHdSTmdXOWk5YnVEYlB3ejFkR3YtNWQ2OV9tS3RmdkVsbWFySC0xTWVZb3B5RkcxZ3ozT3IzYWpWZw?oc=5"}, {"areas": ["south africa"], "body": "The \u2018world-class\u2019 city where South Africans don\u2019t have electricity for five hours a day Daily Investor", "category": "electricity", "id": "b3d8138065cd", "source": "Daily Investor", "time": "Wed, 29 Jul 2026 07:26:04 GMT", "title": "The \u2018world-class\u2019 city where South Africans don\u2019t have electricity for five hours a day", "type": "news", "url": "https://news.google.com/rss/articles/CBMiywFBVV95cUxNb2xQQTB0OFF3d0NYbHVoVUFKUEM2YUtwbkZ1SGlQUFk4Yk5OZWtSSmNpLUdaQ2xfa2dUSTBKb3N6RlNaRnZjcHJIa1IyQlRsdWpvSXh6M0h1VkVBNG5RQ2lkdkptWW5aNWQtUUJBUllQSmRjOGo2X3Y0S0NLcTlQNmx4czU0SzNiM19SbVNySmV6bmloVmNqWlJpTnJXbldwN2lSQXYyZ2xaMlVLaUtIS3czeERBbXZNU0d3RUhsTUo2Rmw4eTRBQlZlRQ?oc=5"}, {"areas": ["south africa"], "body": "More than half of South Africans experience water outages The Citizen", "category": "water", "id": "378e8f6d72af", "source": "The Citizen", "time": "Wed, 25 Feb 2026 08:00:00 GMT", "title": "More than half of South Africans experience water outages", "type": "news", "url": "https://news.google.com/rss/articles/CBMipAFBVV95cUxPd2RaLVBFa3JzNjhidHlUSjZLeEtVc2E3SVVOS0JQV3RoZS1zV0kxaF8yVVFGQllQYTVmWHhyc3NWb05URnhqS0FHaU13cmI5Q0FKS3J1WnVLTnk0SnRtcjkxbTNwSUVQRlVVbFNDbDJMSVVfVHVWT2E5ZEZOTk5Vd19NNEtqazFIWXExVUlmeThBOTJYb1JOMlNlNjlTc01UYXhURg?oc=5"}, {"areas": ["gauteng", "south africa"], "body": "Santaco, GNTA give Gauteng Transport MEC seven-day ultimatum SABC News", "category": "transport", "id": "aec3c52251dc", "source": "SABC News", "time": "Wed, 22 Jul 2026 07:36:58 GMT", "title": "Santaco, GNTA give Gauteng Transport MEC seven-day ultimatum", "type": "news", "url": "https://news.google.com/rss/articles/CBMimgFBVV95cUxQd1RQVzItTDFSdGo0cm1JQ2Z0M2ZDQWNxbkVHUE5SWG9qdmt6bGo1bEFUOS1LcU9WeWRZQVVWS2ZBSHZUTzEzbnNiZ1l2S0lUa3ktTU8yNTRuS0l3YzJGb3dZMVpUaHhCenE5WE1sUE1xZGFsZnV1alYwTHI2b3NvVy1peXNyTUF2ZFhITGV3LXlDQ3pNNC1VVFFR?oc=5"}, {"areas": ["south africa"], "body": "Taxi shutdown warning for South Africa next week TopAuto.co.za", "category": "transport", "id": "0e6fc70b963b", "source": "TopAuto.co.za", "time": "Wed, 22 Jul 2026 07:00:00 GMT", "title": "Taxi shutdown warning for South Africa next week", "type": "news", "url": "https://news.google.com/rss/articles/CBMiiwFBVV95cUxQOXJER3E4T25wLVVwRnVHNTFDNFljSFRzTFZTMWZhTUZoVTdLX1NVS2d4VXFTNmd1ZmJ3ZTVnUFpxSDIyNUR2Z0NjeERleHJpSzlYRjdkek5Fb2pTbUFmWkVMZldwZHNtUzh3R2VNOUh5NkU5SDR6c2ZJWDlwcG9ISlc4UHp1ZkNmVmtv?oc=5"}, {"areas": [], "body": "Taxi operators threaten strike over licence chaos EWN", "category": "transport", "id": "3e90f1a14835", "source": "EWN", "time": "Wed, 22 Jul 2026 07:00:00 GMT", "title": "Taxi operators threaten strike over licence chaos", "type": "news", "url": "https://news.google.com/rss/articles/CBMifEFVX3lxTFBiQi01bjJZcGxaaFBsSmdOSEUtdmlqUjVUUVJRWmE0ZTJQbFgtWmduaDJUUFRkclY4eWlsLUFURUl5YjJUbzA1UDlfdmJKTWpKeVkyMkRLWjFrMTB4ZktBc0tFT0FUS1JrNkstdFp5QXNjZGpNdmtDeVBfdWM?oc=5"}, {"areas": [], "body": "Debate about SA\u2019s falling murder levels masks a deeper crisis ISS Africa", "category": "safety", "id": "aff032e2cec1", "source": "ISS Africa", "time": "Wed, 10 Jun 2026 07:00:00 GMT", "title": "Debate about SA\u2019s falling murder levels masks a deeper crisis", "type": "news", "url": "https://news.google.com/rss/articles/CBMimAFBVV95cUxPYVZCRkplUm5WbGwxVnIzVW5oWlhEMlRzTjNpekw3Rjd6YTdNQVFrbGR5M0MwRVpjTHc4ZWI5Z0dPODFhUTFKal84b1pxNWVwNWxaTlNwN3BuWlJSbUtTMzk2bVNrVmwwVmdiMG44WDVJRmhWQTFSN19PNzJNYW0wbk1najJUYWRabVNvRHFhS0RYdVhhUnpDWg?oc=5"}, {"areas": ["south africa"], "body": "Rand Water completes first phase of maintenance South African Government News Agency", "category": "water", "id": "77c30906edb6", "source": "South African Government News Agency", "time": "Wed, 03 Jun 2026 07:00:00 GMT", "title": "Rand Water completes first phase of maintenance", "type": "news", "url": "https://news.google.com/rss/articles/CBMiiwFBVV95cUxPYmtydm5wajRBZ0VwZV92bk9Rb2NrcDVUYWxoNlNNb19XcEhKS0JVeDNNTHJfM1hTUFlVMWpYd29Hc0hWSGVpN0RPcEhENTU0YlpIcjJvaFMyVGpSbEdadmZiTWt0c2ZiUk1VWDdnMlFEeXpmRkZ4Wkp5U1hyUzFjV0R5dG5SZk12YXcw?oc=5"}, {"areas": ["south africa"], "body": "Snow and heavy rain to hit eastern South Africa as cold front sweeps in novanews.co.za", "category": "weather", "id": "1e3328f79bbd", "source": "novanews.co.za", "time": "Tue, 28 Jul 2026 11:12:39 GMT", "title": "Snow and heavy rain to hit eastern South Africa as cold front sweeps in", "type": "news", "url": "https://news.google.com/rss/articles/CBMimwFBVV95cUxOWnlnU2V4cUV1RDBkVGM0WUJpd24zeUhOX1lUTExxd1BQSmc4QVpURzVjSl9IWE5QUFIweU9rTnAtTXZkU0pUVzVTWlJiVnpqd21RNW14U3VLWjBJNEk0Qm5SazlZRHV6cjNuVU1fMng1X2RDLW14ZVBCZmxNdERrTkhJbV96LWFKdVBvNGtONFBwYUVveUkySnJWYw?oc=5"}, {"areas": ["kwa-zulu natal", "south africa"], "body": "SAWS issues disruptive rainfall warning across KZN SABC News", "category": "weather", "id": "6de036a23e12", "source": "SABC News", "time": "Tue, 28 Jul 2026 03:52:15 GMT", "title": "SAWS issues disruptive rainfall warning across KZN", "type": "news", "url": "https://news.google.com/rss/articles/CBMi1gFBVV95cUxPSy1JbFZXX1diQXE0RDgzS0R4N1o2NlZQM0tmeS1TYklZdzFxR3hZY051UDFlZGJpbU5UR1AyRXhpZ1RCNEhDSi0tVUN0a0E2YUlzXzJWbHlpN0NXamdpMDZ6X2UxZ196UTZaeWVVdEY4SUJzbjBreks1RWMzUGhaVEhVRktZTm1TaFpKMlFNRU1WaFpuVXhnWTlUUWhGcTBiYS1ZVWQ4WWx6N0ZWVjlHWEZnS05LX192ZU5rODhUWGxULUcwZ3VhN0NUbldEbVRSTWo3WXN3?oc=5"}, {"areas": ["gauteng"], "body": "DA Gauteng urges MEC Diale-Tlabela to promptly resolve escalating taxi industry dispute dagauteng.org.za", "category": "transport", "id": "3f1a83af96e6", "source": "dagauteng.org.za", "time": "Tue, 21 Jul 2026 12:02:22 GMT", "title": "DA Gauteng urges MEC Diale-Tlabela to promptly resolve escalating taxi industry dispute", "type": "news", "url": "https://news.google.com/rss/articles/CBMivAFBVV95cUxPN0dhaTlhNXl0NVFwQnluVGFmMHdMS004QWU0M1VON0VPU0RVUVhuRGRsQVpXVDdwcUZiVmVhRnBELXg0M3owTS1EVjBNM3h4ZmhuVUhaMEpvRURVYmJpQ2ljUjFkYjlrVS02Z01pRGx3NXlSV0FGdTdxYmtOaTQtamFucWtUMnp2X252dld6SzdHaEE4cnp3MW9QaV9YOXQyb3dvMzVGZmFORXlmZnFnOWM4S0NpOE5EcEY0Yw?oc=5"}, {"areas": ["south africa"], "body": "Water outages cripple South Africa\u2019s richest city newsday.co.za", "category": "water", "id": "76b933ddbd4f", "source": "newsday.co.za", "time": "Tue, 03 Feb 2026 08:00:00 GMT", "title": "Water outages cripple South Africa\u2019s richest city", "type": "news", "url": "https://news.google.com/rss/articles/CBMikwFBVV95cUxNME1vUHhjLWVZRnQwZm4xVXVBOFBVc0ZPWTMycUJscVV5X0VYLW5wc0tTQVlrQVY1cVlKNlQ0b1JPWURreVZEMWNucmt3QVlRMExJdU80ZXZ0UHpreFpDbHFiYy1YWlFWeVdVaC1sQTdLdE85MjVBaktFam5DX1V2X3FmbHJPQ0lmcGRfZktYd0gwNzQ?oc=5"}, {"areas": ["south africa"], "body": "Big changes coming for electricity prices in South Africa businesstech.co.za", "category": "electricity", "id": "062b309db927", "source": "businesstech.co.za", "time": "Thu, 30 Jul 2026 14:34:27 GMT", "title": "Big changes coming for electricity prices in South Africa", "type": "news", "url": "https://news.google.com/rss/articles/CBMipwFBVV95cUxQSnYtVG1JZDliOEpheEdzbERKeVoyYnFlcVRiR1VJdGxRdm40ZjluOE9CY2ZEMm5KSkw4eGxpQzB5OWljMFJpSWt2LXpObW1fekU3U2tEM1JJUzFremFjQ1B5cnp0ZWtYY096R3Bvc0Y5Mjh0UDE4VzRJUjFFWkM2TFpyNGtXdDNUQ01TRFNPYndLSENPZDd4emNzX0E3WDVGeWhabE13WQ?oc=5"}, {"areas": ["south africa"], "body": "The end of Eskom\u2019s monopoly? Cabinet approves new electricity pricing policy, reform roadmap News24", "category": "electricity", "id": "01a7e5b995d4", "source": "News24", "time": "Thu, 30 Jul 2026 14:30:14 GMT", "title": "The end of Eskom\u2019s monopoly? Cabinet approves new electricity pricing policy, reform roadmap", "type": "news", "url": "https://news.google.com/rss/articles/CBMi7gFBVV95cUxQZmlkS1hMMDg4eHdSZGtzeHd1bXRxT2hkMUFvNElRc1AxMzdYSWVLZkxiaXBLZER0V2VpVmFNbVNVQ0lQMDdVb3NNYmliRE5idF9Hc1hyMDhGV3JzOThwU21ZZ1ItWUJ3d0tORzVYZ1NQRkNJelBYT1RnTXhBeG4xMXB5S2VQMHlMWks1M3dTclJ3VGZ4UzdEcGIzZUpaR2RFeW1fQkJwaDNQSkNyYUZzdG9LazhobGlXUUprQTRCaG9ISkNsbUtjV2lxenZDVTFmMnVGOVV4SVZHQTNDXzZXSnBkMUg3d0JaeE5ZUlFB?oc=5"}, {"areas": ["south africa"], "body": "Best news at Eskom in 9 years MyBroadband", "category": "electricity", "id": "b8b7c803f24c", "source": "MyBroadband", "time": "Thu, 30 Jul 2026 13:59:07 GMT", "title": "Best news at Eskom in 9 years", "type": "news", "url": "https://news.google.com/rss/articles/CBMihgFBVV95cUxPZV84T3p2V09jZFYxS09WLUFyWEhuQmJmay1CMnhSZEhHMVloVWgxSjFQcEx3T08xUUhBQ2ROR1hIRFVRV180VEZhdDVVNjdwSXNTcUctZ3ZrZU56RzNSWHZDM0JZTDdOcVBxbFB5RDdzY2lDZWdnSmZIc3BWSTRzOXF6YjVtQQ?oc=5"}, {"areas": ["south africa"], "body": "Unscrambling South African AI business limitations news.uct.ac.za", "category": "economy", "id": "89889e69b345", "source": "news.uct.ac.za", "time": "Thu, 30 Jul 2026 10:55:34 GMT", "title": "Unscrambling South African AI business limitations", "type": "news", "url": "https://news.google.com/rss/articles/CBMingFBVV95cUxQTDk1XzFoYXhrZXYwdzNYV3lOaDZLcnFxRTF1ckhKakllZWw5czFtdUpLWFdfTEtRdXdGMVBQZ2tQUGJDT3RFR0FfQ0d2aWNFUU5VNnhRU0dOS1dNVnltazlleWprTm5lZmc2N2kyUjUycHRJT1RCenVueTB4RlNfZnpLWllUUDItUGg2anBMb3BhMWRYU3AyTnRjbW5tQQ?oc=5"}, {"areas": [], "body": "Today\u0027s weather: Cold front and coastal rain set the tone for July\u0027s first day IOL", "category": "weather", "id": "a15d2492c0fd", "source": "IOL", "time": "Thu, 30 Jul 2026 07:00:00 GMT", "title": "Today\u0027s weather: Cold front and coastal rain set the tone for July\u0027s first day", "type": "news", "url": "https://news.google.com/rss/articles/CBMiugFBVV95cUxOZEZJbnA4VUhYeUtQRUtuRElqZE5CQzUweGZlQ0pRcERydFVvQkEzdEhvQmVsNXZDSEpOU2d2OXFpYWRrVkFtelpTcHIyZUtrUC1rZFA5WXNNSFNPdDNMOWZQYjY3OGpjYVB1VjZNMFotOGlyUTdYQTU4TFduSS0tSG5nd3BOb1FIZTFhNXFiZnhmZ2pyOEdrRW90Skd3eDIzRF9JNHdYdXByaU5lVEtsdGwwNVNwVDl5bEE?oc=5"}, {"areas": ["south africa"], "body": "How South Africa Ended Load Shedding Without New Infrastructure energyforgrowth.org", "category": "electricity", "id": "74ae73026148", "source": "energyforgrowth.org", "time": "Thu, 30 Apr 2026 07:00:00 GMT", "title": "How South Africa Ended Load Shedding Without New Infrastructure", "type": "news", "url": "https://news.google.com/rss/articles/CBMiogFBVV95cUxQQ2F1NWc5X0I5M3F2V0xXLUtLdFZNZVJROENjQUNEVXJaQnFJZDJvZ3Q5bUNkMkJzTVBkczh3c19oWUxTMGpVX2xtUGtFQnh5WXJuRjdraXJsWTVyeTRra0kyZUxnRmZPRXZ4d2xNRG1CYTdaeVl2R24zV3ltd1paMUZGVnFMa1NuMWtlTmZBbkNla0ZEamVBXy1OelFEQUhxLVE?oc=5"}, {"areas": [], "body": "Load shedding is over \u2013 and that\u2019s exposing a new energy crisis TechCentral", "category": "electricity", "id": "7ecedda42e96", "source": "TechCentral", "time": "Thu, 23 Jul 2026 07:00:00 GMT", "title": "Load shedding is over \u2013 and that\u2019s exposing a new energy crisis", "type": "news", "url": "https://news.google.com/rss/articles/CBMimgFBVV95cUxPS05kZ3BRTFFXYlUxMUJMY3g3V1B6OHYxR3RvVHlzOXNWNmw4c05SZlBUMVFEbFRFQkhIaXNNT1RfZkg4TmRxa0tmanZLZXhIbUxDMFpMOHRlNVFYM2h5Z1dQYVI5RUpNV1pndnY3V3JrRnlXWV9zWFRDeG14WXQxOVg5eENmWjBPMXFoRzM2QzQ2Qjh1b0ZicC1n?oc=5"}, {"areas": ["south africa"], "body": "How to apply for Spaza Shop funding: A step-by-step guide South African Government News Agency", "category": "economy", "id": "96b9a56e5199", "source": "South African Government News Agency", "time": "Thu, 23 Jul 2026 07:00:00 GMT", "title": "How to apply for Spaza Shop funding: A step-by-step guide", "type": "news", "url": "https://news.google.com/rss/articles/CBMiiwFBVV95cUxPVjFmN3loeXhKNjMtZjV2aUxWVUg2RWFTNUlkZU5YY3MzX3NxMUt2dDY1ZmwzTlRjYnotZU9CZkpBVE53cnRVSmhCQ0xHNFZ1MGZVeG9tbjZWX1J2Vzk1VjFPcjlyQURKMVAydzM1bGt3OXNackRkQTFGLXBFU2hTM3RodnVLZXR2ZUFB?oc=5"}, {"areas": ["gauteng", "south africa"], "body": "Gauteng water crisis: Majodina approves extra Rand Water abstraction to stabilise supply mg.co.za", "category": "water", "id": "b1370c780758", "source": "mg.co.za", "time": "Thu, 19 Feb 2026 08:00:00 GMT", "title": "Gauteng water crisis: Majodina approves extra Rand Water abstraction to stabilise supply", "type": "news", "url": "https://news.google.com/rss/articles/CBMi0AFBVV95cUxPcXl0eWMzRlVsc2JKeUl3aHlad1IzV3hlOGliZk9uRmNHckxubzgzWDk0Z05qUUhyajhNUURFVWZPVThrc1hhdDFrMDZGSjl5WDIxWG40cVhMNnJVSXE4VnRiWmNndHV2RWpKV0l0ZXZxUmVQUGdwaWg3TUtNdkxIODUtQ09uMWpaclpMTURwRFFieUxFSGdLdmhFV0lReENrQkkxWU5LU0hwVjY3QXZaWGtYMVcxcWltOXlLc016a2R3VEZlZWRlWmdDTTljLVZ4?oc=5"}, {"areas": ["south africa"], "body": "City Power Outage Disrupts Water Pumping Operations At Rand Water\u0027s Eikenhof Booster Station infrastructurenews.co.za", "category": "water", "id": "a4ad8d65ffd5", "source": "infrastructurenews.co.za", "time": "Thu, 16 Jul 2026 07:00:00 GMT", "title": "City Power Outage Disrupts Water Pumping Operations At Rand Water\u0027s Eikenhof Booster Station", "type": "news", "url": "https://news.google.com/rss/articles/CBMi0gFBVV95cUxNT3BoRUtFT3N3QklKT2hSakxZdVB0VGIwMmh5NUEwT1ZtS05MVmd4TWo1ZlhPWGJHcnFqYktZY2YxR3h1YXZZM3EyTHMyT2ZvTXljUTlsX3dkcTNfd2xfX3R4aEc5YjdTYVcwTWE5ZWVUcmxCclVScUlUbVdGWDJTNElJLWhGVjY4R012U0hhOEpUeU1lTWtiNFpLUTBRV3AxNWlfakRYb0JFeUJzd0tCMFlTX1h0MGRqZ3dTRWM2YkIyajRld1ZlUm5OejdwdmY2a2c?oc=5"}, {"areas": ["south africa"], "body": "Five provinces removed from load reduction schedule South African Government News Agency", "category": "electricity", "id": "c90a1412567b", "source": "South African Government News Agency", "time": "Thu, 09 Jul 2026 07:00:00 GMT", "title": "Five provinces removed from load reduction schedule", "type": "news", "url": "https://news.google.com/rss/articles/CBMijgFBVV95cUxOVTB5UE1tdVplVnBrLWZ1OXJzdXJnSWJCVkhydk1ZSDRmMmNiZkJ6Y0pLU2stSDRfdENBZWJER19NRnZBU05PdHZYZ3MwS0VncF9yZ0w1TEJQMGRaWWp1R0pJUkNGVUl1SUxSRVE1Nm1pVk4wczZvUnNCVGpROVBtTDZHQVRDVmlFUnJsR3lR?oc=5"}, {"areas": ["gauteng", "south africa"], "body": "\u2018System under pressure\u2019: Gauteng water crisis deepens as Rand Water cuts supply IOL", "category": "water", "id": "7f306a1e37e7", "source": "IOL", "time": "Sun, 08 Feb 2026 08:00:00 GMT", "title": "\u2018System under pressure\u2019: Gauteng water crisis deepens as Rand Water cuts supply", "type": "news", "url": "https://news.google.com/rss/articles/CBMiwgFBVV95cUxPZEtueFktVWdMdnZTWFJ5U0FSek5RRUZEVHg0UVJWeDV1MEExSzZXNEQ2ODBKMUlYd2tOSFRVSFh1NWxralN5eU1kQm5iVmYtU3k2MU93cWxoUTB2QjZSU0t0Y05aMVNEeVZOamp6am5mbVdVZkplejA5TFhVRDdEd3JXY0pmMFVjMFJLV2I4aGVDSHVHSUNBQVhXS2ZQa1gtMmttSXVBUVZ6UEhlUzJaNERJWkt5VXpMM28zYXNNZW9HUQ?oc=5"}, {"areas": ["mpumalanga"], "body": "The former employee denied forcefully kissing a Grade 9 pupil.", "category": "other", "id": "5b2d243a9043", "source": "The Citizen", "time": "Sun, 02 Aug 2026 12:34:19 +0000", "title": "Mpumalanga school official barred from working with kids after sexual harassment dismissal", "type": "news", "url": "https://www.citizen.co.za/news/mpumalanga-school-sexual-harassment-dismissal/"}, {"areas": ["south africa"], "body": "Malls in one area have the highest earnings of any other province, but also have some of the highest rental costs for tenants.", "category": "economy", "id": "1180fb1bc7f0", "source": "BusinessTech", "time": "Sun, 02 Aug 2026 12:00:00 +0000", "title": "The most expensive province for shopping malls in South Africa", "type": "news", "url": "https://businesstech.co.za/news/property/867730/the-most-expensive-province-for-shopping-malls-in-south-africa/"}, {"areas": ["south africa"], "body": "The 58-year-old recently returned to South Africa after his stint as France\u0027s kicking coach came to an early end.", "category": "other", "id": "de9a6ab9e365", "source": "The Citizen", "time": "Sun, 02 Aug 2026 11:33:19 +0000", "title": "Former Springbok flyhalf on Bulls radar", "type": "news", "url": "https://www.citizen.co.za/sport/rugby/former-bok-flyhalf-on-bulls-radar-rugby/"}, {"areas": [], "body": "Priced at just R499 900, this full house seven-seater SUV is powered by a 1.6 litre turbocharged petrol engine.", "category": "other", "id": "d018e6f19fba", "source": "The Citizen", "time": "Sun, 02 Aug 2026 11:00:00 +0000", "title": "Stylish new Chery Tiggo 8 Pro LS offers even more at the price", "type": "news", "url": "https://www.citizen.co.za/motoring/stylish-new-chery-tiggo-8-pro-ls/"}, {"areas": ["western cape"], "body": "Residents of Cape Town have been warned against housing scams circulating over social media.", "category": "weather", "id": "9fd866066d4b", "source": "BusinessTech", "time": "Sun, 02 Aug 2026 11:00:00 +0000", "title": "Warning for anyone living in Cape Town", "type": "news", "url": "https://businesstech.co.za/news/government/866995/warning-for-anyone-living-in-cape-town/"}, {"areas": [], "body": "The men stopped to change a tyre when they were shot.", "category": "transport", "id": "d934819eb3c6", "source": "The Citizen", "time": "Sun, 02 Aug 2026 10:29:54 +0000", "title": "Nyanga massacre: Four men gunned down in suspected taxi hit", "type": "news", "url": "https://www.citizen.co.za/news/south-africa/crime/nyanga-massacre-four-men-gunned-down-suspected-taxi-hit/"}, {"areas": ["south africa"], "body": "The DA claims there\u0027s been no proof of a lawful transfer of the allocated billions of rand.", "category": "other", "id": "8aea28709585", "source": "The Citizen", "time": "Sun, 02 Aug 2026 10:07:42 +0000", "title": "Committee slams DA irregularity claims in Parliament rebuild", "type": "news", "url": "https://www.citizen.co.za/news/committee-slams-da-irregularity-claims-parliament-rebuild/"}, {"areas": ["south africa"], "body": "Police intensify fight against drug smuggling SABC News", "category": "safety", "id": "2ab6e02c152c", "source": "SABC News", "time": "Sun, 02 Aug 2026 10:01:31 GMT", "title": "Police intensify fight against drug smuggling", "type": "news", "url": "https://news.google.com/rss/articles/CBMihwFBVV95cUxPN0ZjaUJVLTJiU3NQcy1pYThUelZtSVI2SThzSnA2bDFabjZVd2pXSFUwNjJNNVYtUFFkcFluVHhNWlpuNThnWTRBN2ducG1mdlJpdExGOGRjLVQ1bGY0VjZHeVB5UmxwLW04dnFBbXd2aWlkMkpDdmc1Y0cyTFlJNlF2RkhIeDA?oc=5"}, {"areas": [], "body": "\u0027For me it sounds like January is a good date for him to try and come back. I might get proven wrong, or a doctor might phone me later and say you\u0027re totally wrong.\u0027", "category": "other", "id": "f57cfc184b97", "source": "The Citizen", "time": "Sun, 02 Aug 2026 09:35:50 +0000", "title": "World Cup-winning Bok prop set for January comeback?", "type": "news", "url": "https://www.citizen.co.za/sport/rugby/world-cup-winning-bok-prop-set-for-january-comeback-rugby/"}, {"areas": ["south africa"], "body": "Ramaphosa signed the Expropriation Bill into law in January 2025, setting new guidelines for land expropriation without compensation.", "category": "other", "id": "21186aebd2ec", "source": "The Citizen", "time": "Sun, 02 Aug 2026 09:22:55 +0000", "title": "High Court showdown: DA, AfriForum, IRR challenge Ramaphosa\u2019s Expropriation Law", "type": "news", "url": "https://www.citizen.co.za/news/south-africa/high-court-showdown-da-afriforum-irr-challenge-ramaphosas-expropriation-law/"}, {"areas": ["south africa"], "body": "4 South African Entrepreneurs Who Turned Setbacks into Success goodthingsguy.com", "category": "economy", "id": "079a8e8d4e58", "source": "goodthingsguy.com", "time": "Sun, 02 Aug 2026 09:01:50 GMT", "title": "4 South African Entrepreneurs Who Turned Setbacks into Success", "type": "news", "url": "https://news.google.com/rss/articles/CBMimAFBVV95cUxQZzROeXdMbGE2dlh2VTJpblNxSFR0SHNRWmlXZUxscmRNVHNNNlp5Y0pJWktEb0xhZ19JRllxYzl5dkNFYzdmQ2JSVjg4SHdqaHR6TUQxeEZnTTE4U1lrTlR3eVlfbkFJWE9LMzB3THI4M3NHWjB3RkVSVjBvWG1TMHJBSVo1M3BKTWctbXktR2ducEVsQnVEbA?oc=5"}, {"areas": ["western cape", "south africa"], "body": "The Cape Cadogan Boutique Hotel in Cape Town has been ranked as Africa\u2019s Best City Hotel in Travel and Leisure\u2019s World\u2019s Best Awards for 2026.", "category": "other", "id": "e614aa27985f", "source": "BusinessTech", "time": "Sun, 02 Aug 2026 09:00:00 +0000", "title": "Another South African hotel has just been ranked as one of the best in the world", "type": "news", "url": "https://businesstech.co.za/news/lifestyle/867535/another-south-african-hotel-has-just-been-ranked-as-one-of-the-best-in-the-world/"}, {"areas": [], "body": "Probe underway into multi million-rand drug bust at OR Tambo EWN", "category": "safety", "id": "fd8c39677407", "source": "EWN", "time": "Sun, 02 Aug 2026 08:37:20 GMT", "title": "Probe underway into multi million-rand drug bust at OR Tambo", "type": "news", "url": "https://news.google.com/rss/articles/CBMimAFBVV95cUxQZm5YRms0cktkWVVkc0V6MDlZUklqbG55TWRHMnZJT0Q3OVhLQUVOcnJMQldPRy0xZ0hPVVdOdkx4U3Z2MjZkaENVYTZUVlZWMkdvbjl0ZFNSRmtDZjRSZ0FyQUdUNXUzeHpBS2lfOHVFZkhxN050SFgxbUtyWUZQX0o0OGVmaENrTU1zSUlkc3FQNjJxdjRQaw?oc=5"}, {"areas": ["south africa"], "body": "Documents reveal that Prasa tapped into the Airports Company of South Africa\u0027s (Acsa) panel of security contractors in July 2021.", "category": "transport", "id": "2ddd2532f33b", "source": "The Citizen", "time": "Sun, 02 Aug 2026 08:23:04 +0000", "title": "ANC veteran\u2019s R1bn Prasa security deal under scrutiny", "type": "news", "url": "https://www.citizen.co.za/news/anc-veterans-r1bn-prasa-security-deal-under-scrutiny/"}, {"areas": ["south africa"], "body": "The small Karoo town in South Africa is one of three places in the world where you can see the Red Stone Hills.", "category": "other", "id": "53ec8912f660", "source": "BusinessTech", "time": "Sun, 02 Aug 2026 08:00:00 +0000", "title": "The tiny South African Town home to a marvel found in only three places on Earth", "type": "news", "url": "https://businesstech.co.za/news/lifestyle/866535/the-tiny-south-african-town-home-to-a-marvel-found-in-only-three-places-on-earth/"}, {"areas": ["western cape"], "body": "There were also good wins for Grey College and Jeppe.", "category": "other", "id": "a6586b718ff7", "source": "The Citizen", "time": "Sun, 02 Aug 2026 07:59:12 +0000", "title": "Gimnasium too good for Boys High in Paarl derby: Selected schoolboy rugby results", "type": "news", "url": "https://www.citizen.co.za/sport/rugby/gimnasium-too-good-for-boys-high-in-paarl-derby-selected-schoolboy-rugby-results/"}, {"areas": ["south africa"], "body": "Backstroke swimmer Pieter Coetz\u00e9 was particularly impressive at the Commonwealth Games, securing six medals.", "category": "other", "id": "df5eb74beeb7", "source": "The Citizen", "time": "Sun, 02 Aug 2026 07:45:12 +0000", "title": "OPINION: SA swimmers showing promise ahead of 2028 Olympic Games", "type": "news", "url": "https://www.citizen.co.za/sport/sa-swimmers-showing-promise-2028-olympic-games/"}, {"areas": [], "body": "Entry-level 03T variant has a smaller battery and less range than its all-wheel drive sibling, but with a loaded spec sheet and a R60 000 price credit.", "category": "other", "id": "1bdf3745cace", "source": "The Citizen", "time": "Sun, 02 Aug 2026 07:00:00 +0000", "title": "Two-wheel gripping iCaur 03T still an enticing EV box full of tricks", "type": "news", "url": "https://www.citizen.co.za/motoring/icar-03t-2wd-road-test-south-africa/"}, {"areas": [], "body": "Beyond sloganeering and events, Chikunga wants women who are calling the shots, economically.", "category": "other", "id": "e2d8dcf8528c", "source": "The Citizen", "time": "Sun, 02 Aug 2026 06:58:30 +0000", "title": "Women\u2019s Month: Chikunga demands \u2018economic power, not slogans\u2019", "type": "news", "url": "https://www.citizen.co.za/news/south-africa/womens-month-chikunga-demands-economic-power-not-slogans/"}, {"areas": ["kwa-zulu natal"], "body": "Authorities are investigating the cause of both accidents.", "category": "other", "id": "c8a70e9701cf", "source": "The Citizen", "time": "Sun, 02 Aug 2026 06:19:13 +0000", "title": "Carnage in KZN: Four dead, several hurt in weekend crashes", "type": "news", "url": "https://www.citizen.co.za/news/carnage-kzn-dead-several-hurt-weekend-crashes/"}, {"areas": ["south africa"], "body": "Here are 5 important things happening in and affecting South Africa on Sunday, 2 August 2026.", "category": "economy", "id": "84b824aa218f", "source": "BusinessTech", "time": "Sun, 02 Aug 2026 06:01:46 +0000", "title": "Over R500 in taxes for a tank of petrol, and South African company owned by an American billionaire\u2019s daughter", "type": "news", "url": "https://businesstech.co.za/news/5-things/868395/over-r500-in-taxes-for-a-tank-of-petrol-and-south-african-company-owned-by-an-american-billionaires-daughter/"}, {"areas": ["kwa-zulu natal"], "body": "Between February 2018 and October 2018, the woman submitted fraudulent VAT returns on behalf of her company.", "category": "economy", "id": "4e80dac143c3", "source": "The Citizen", "time": "Sun, 02 Aug 2026 05:52:42 +0000", "title": "Durban woman jailed for 18 years for R3.7m Sars Vat fraud", "type": "news", "url": "https://www.citizen.co.za/news/south-africa/courts/durban-woman-jailed-18-years-sars-vat-fraud/"}, {"areas": [], "body": "The incident apparently happened in the first few minutes of the second half.", "category": "other", "id": "f5e5fee3fe39", "source": "The Citizen", "time": "Sun, 02 Aug 2026 05:06:06 +0000", "title": "Noordvaal to investigate schools rugby brawl between Menlopark and EG Jansen [VIDEO]", "type": "news", "url": "https://www.citizen.co.za/sport/rugby/noordvaal-investigate-schools-rugby-brawl-menlopark-eg-jansen-video/"}, {"areas": [], "body": "Calling GBV an urgent disaster is not useful until someone does something about it", "category": "safety", "id": "ccfea50b1430", "source": "The Citizen", "time": "Sun, 02 Aug 2026 05:02:00 +0000", "title": "Government shows how much it cares about GBV by appointing council two years later", "type": "news", "url": "https://www.citizen.co.za/news/opinion/government-shows-how-much-it-cares-about-gbv-by-appointing-council-two-years-later/"}, {"areas": ["south africa"], "body": "What makes your home a target for criminals in South Africa businesstech.co.za", "category": "safety", "id": "22e0e7c37763", "source": "businesstech.co.za", "time": "Sun, 02 Aug 2026 05:01:23 GMT", "title": "What makes your home a target for criminals in South Africa", "type": "news", "url": "https://news.google.com/rss/articles/CBMirgFBVV95cUxNVlZuS1JSNDdxWGcyQklKaEVfVWtneXNoaGFoNGpGS05jeWJGSWZWUERMWDdwT1hFVW1uSllfNGxiN1ZrUHRwbjk1TkJQdjgyWUJJc3BEMFBCNGVDMVBabG5USGc1TVFrLUZROUpmNm1rWE1TM3laMnpOd1JfTEV5MC0yOC03X3RlUnJpTG53dXZYVU96T0d4U1ZtQ01FejJpLUZWaUlvdFJlWXo3YWc?oc=5"}, {"areas": ["south africa"], "body": "Homeowners in South Africa are being warned that there are some aspects of a home that make it an attractive target for opportunistic criminals.", "category": "other", "id": "76665a1eb36e", "source": "BusinessTech", "time": "Sun, 02 Aug 2026 05:00:00 +0000", "title": "What makes your home a target for criminals in South Africa", "type": "news", "url": "https://businesstech.co.za/news/lifestyle/868369/what-makes-your-home-a-target-for-criminals-in-south-africa/"}, {"areas": [], "body": "Households need to review how their money is allocated.", "category": "other", "id": "f7cc2979082d", "source": "The Citizen", "time": "Sun, 02 Aug 2026 04:55:00 +0000", "title": "Saving does not mean giving something up: Here\u2019s how to put extra money aside", "type": "news", "url": "https://www.citizen.co.za/business/personal-finance/saving-does-not-mean-giving-something-up-heres-how-to-put-extra-money-aside/"}, {"areas": [], "body": "\u0027The players that came on today helped keep the level very high,\u0027 Da Cruz told SuperSport TV.", "category": "other", "id": "d75fb88e16fb", "source": "The Citizen", "time": "Sun, 02 Aug 2026 04:38:37 +0000", "title": "Chiefs\u2019 Da Cruz praises subs impact after taming Kruger", "type": "news", "url": "https://www.citizen.co.za/sport/soccer/local-soccer/chiefs-da-cruz-praises-subs-impact-taming-kruger/"}, {"areas": [], "body": "\u0027We will give him all the trust and help to bring him up to a high level,\u0027 said Pirates head coach Abdeslam Ouaddou.", "category": "other", "id": "c0f2a6f61045", "source": "The Citizen", "time": "Sun, 02 Aug 2026 04:11:06 +0000", "title": "Why Pirates \u2018have to be careful\u2019 with young star Dansin", "type": "news", "url": "https://www.citizen.co.za/sport/soccer/local-soccer/why-pirates-have-be-careful-young-star-dansin/"}, {"areas": [], "body": "0 to 100 km/h in just 2.71 seconds, the new Mercedes-AMG CLA 45 goes deep into supercar performance territory.", "category": "other", "id": "6c6cb63e5d7d", "source": "The Citizen", "time": "Sun, 02 Aug 2026 04:00:00 +0000", "title": "Brutal 500kW Mercedes-AMG CLA 45 breaks cover", "type": "news", "url": "https://www.citizen.co.za/motoring/brutal-500kw-mercedes-amg-cla-45-breaks-cover/"}, {"areas": ["south africa"], "body": "Eskom delivers 365 days without loadshedding, advancing the economy, competition and the integration of renewable energy eskom.co.za", "category": "electricity", "id": "c9e57080eaef", "source": "eskom.co.za", "time": "Sat, 16 May 2026 07:00:00 GMT", "title": "Eskom delivers 365 days without loadshedding, advancing the economy, competition and the integration of renewable energy", "type": "news", "url": "https://news.google.com/rss/articles/CBMi2wFBVV95cUxOYWdHR21udW5jQW80RXhqclBkMW9hR0RoQlhTVjN1RlpYOXF0bkpaZFpyazZFcnZjZXI1TGkxRjFFQkNoYmRlUEJHRDhsclFENDBGUnJmX2o0QmhHWnU1NzlOQ2JlcmJLTGZ1V0dXaHhJX3VnR2thZmdjdHpLdUdyaWVXanpxaGlyLThzM2VORXUwT3lOc1M4MGF2YUNRN2xaamVnSE5paWtEQ0JNMVAxMHNSMzhFYTFocmtXbEo0RTRJR2dwNVlmNkU4SnozTVd2NlA5ZTdVZElaTG8?oc=5"}, {"areas": ["south africa"], "body": "Small business in one of South Africa\u2019s poorest areas crushed by government incompetence newsday.co.za", "category": "economy", "id": "c01109401275", "source": "newsday.co.za", "time": "Sat, 01 Aug 2026 16:35:57 GMT", "title": "Small business in one of South Africa\u2019s poorest areas crushed by government incompetence", "type": "news", "url": "https://news.google.com/rss/articles/CBMiyAFBVV95cUxQaXVyLW5SdldmWFplVFRmTHJnakIwY0VPSlJnbjByOXNScjRaX21VOXJ3Yjc4M1lRWURET0dOR2lPdTBjUHB3bllQQV9iUlRYX193RWl2N2NzZDd0VXhuZ1VUa1E4dkpkd3pkQWpYODhycFI0NGFHWTN6aWdqdmVKb21kNWExQl9La0FsN0ZfZ3hqUHNhb0xuNWpEX3kwWEZ5RFdlQ29scjEtczZfampDd1FmRGhPd25ueU03MjZsYXNfUHNMOTh1VA?oc=5"}, {"areas": ["south africa"], "body": "Three stores have capitalised on South Africa\u2019s affordability crisis, offering groceries for up to 65% cheaper than major retailers.", "category": "economy", "id": "8494739ca91b", "source": "BusinessTech", "time": "Sat, 01 Aug 2026 15:00:00 +0000", "title": "Three new food retailers up to 65% cheaper than SPAR, Checkers, and Pick n Pay in South Africa", "type": "news", "url": "https://businesstech.co.za/news/business/867758/three-new-food-retailers-up-to-65-cheaper-than-spar-checkers-and-pick-n-pay-in-south-africa/"}, {"areas": ["south africa"], "body": "Delivery drivers in South Africa could earn thousands of rands every week, but the dangers of the job make it a risky source of income.", "category": "other", "id": "3a6a2c131987", "source": "BusinessTech", "time": "Sat, 01 Aug 2026 14:00:00 +0000", "title": "How much money Uber Eats drivers can earn in South Africa", "type": "news", "url": "https://businesstech.co.za/news/business/867676/how-much-money-uber-eats-drivers-can-earn-in-south-africa/"}], "meta": {"cached_items": 109, "last_fetch": 1785677328.6395175, "refresh_seconds": 900}}, "services": {"checklists": {"heatwave": {"steps": ["Drink water regularly \u2014 don\u0027t wait until you\u0027re thirsty.", "Stay out of the sun between 11:00-15:00.", "Never leave children or pets in parked cars.", "Check on the elderly, infants and outdoor workers.", "Watch for signs of heatstroke: confusion, rapid pulse, no sweating."], "title": "During extreme heat"}, "load_shedding": {"steps": ["Keep phones and power banks charged before the cut.", "Unplug sensitive electronics to protect against surges when power returns.", "Keep fridge doors closed to preserve food (lasts 4-6 hours).", "Use LED lights / solar lanterns \u2014 never candles near flammable material.", "Report extended outages (longer than the schedule) to your supplier."], "title": "During load-shedding / power cuts"}, "storm_flood": {"steps": ["Never walk or drive through flooded roads or bridges \u2014 turn around.", "Move valuables and livestock to high ground early.", "Stay indoors during lightning; unplug electronics.", "Keep emergency numbers saved: 10111, 112, 10177.", "Check on elderly neighbours and children."], "title": "During storms \u0026 floods"}, "water_outage": {"steps": ["Store water in clean containers BEFORE the outage (bath tubs, buckets, bottles).", "Boil stored water before drinking if the outage is unplanned.", "Report the outage to your municipality \u2014 every report counts.", "Don\u0027t open taps repeatedly \u2014 airlocks slow restoration.", "Check for tanker schedules in your area; share locations on the app."], "title": "During a water outage"}}, "services": {"electricity": {"icon": "\u26a1", "items": [{"name": "Eskom (national)", "note": "Faults \u0026 load-shedding queries", "type": "call", "value": "0860 037 566"}, {"name": "Eskom load-shedding status", "note": "Official status page", "type": "link", "value": "https://loadshedding.eskom.co.za"}, {"name": "City Power (Johannesburg)", "note": "Faults", "type": "call", "value": "0860 562 874"}, {"name": "City of Cape Town", "note": "Electricity faults", "type": "call", "value": "0860 103 089"}, {"name": "eThekwini Electricity", "note": "Durban metro", "type": "call", "value": "0800 311 1111"}, {"name": "Tshwane Electricity", "note": "Pretoria metro", "type": "call", "value": "012 358 9999"}, {"name": "Ekurhuleni", "note": "East Rand metro", "type": "call", "value": "0860 543 000"}], "title": "Electricity"}, "emergency": {"icon": "\ud83c\udd98", "items": [{"name": "SAPS (police)", "note": "Emergencies", "type": "call", "value": "10111"}, {"name": "Mobile emergency (all networks)", "note": "Works without airtime", "type": "call", "value": "112"}, {"name": "Ambulance / Fire (varies by province)", "note": "Check your province", "type": "call", "value": "10177"}, {"name": "GBV Command Centre", "note": "Gender-based violence, 24h, free", "type": "call", "value": "0800 428 428"}, {"name": "Crime Stop", "note": "Anonymous crime tip-offs", "type": "call", "value": "08600 10111"}, {"name": "Childline", "note": "Free, 24h", "type": "call", "value": "116"}, {"name": "Disaster Management (national)", "note": "NDMC", "type": "link", "value": "https://www.ndmc.gov.za"}], "title": "Emergency \u0026 Safety"}, "transport": {"icon": "\ud83d\ude8c", "items": [{"name": "Gautrain", "note": "Call centre", "type": "call", "value": "0800 428 7246"}, {"name": "Gautrain live departures", "note": "App + web", "type": "link", "value": "https://www.gautrain.co.za"}, {"name": "Prasa / Metrorail", "note": "Service notices", "type": "link", "value": "https://www.prasa.com"}, {"name": "Rea Vaya (Joburg BRT)", "note": "Routes \u0026 disruptions", "type": "link", "value": "https://www.reavaya.org.za"}, {"name": "MyCiTi (Cape Town)", "note": "Routes \u0026 disruptions", "type": "link", "value": "https://www.myciti.org.za"}, {"name": "JRA roadworks", "note": "Joburg roads", "type": "link", "value": "https://www.jra.org.za"}, {"name": "SANRAL", "note": "National roads \u0026 tolls", "type": "link", "value": "https://www.sanral.co.za"}], "title": "Transport"}, "water": {"icon": "\ud83d\udeb0", "items": [{"name": "Johannesburg Water", "note": "Faults (24h)", "type": "call", "value": "0860 562 874"}, {"name": "Johannesburg Water WhatsApp", "note": "SMS/WhatsApp logged faults", "type": "whatsapp", "value": "0797691333"}, {"name": "Johannesburg Water", "note": "Outage notices", "type": "link", "value": "https://www.johannesburgwater.co.za"}, {"name": "Rand Water", "note": "Bulk supply \u0026 maintenance", "type": "link", "value": "https://www.randwater.co.za"}, {"name": "Cape Town Water", "note": "Faults", "type": "call", "value": "0860 103 089"}, {"name": "eThekwini Water", "note": "Durban metro", "type": "call", "value": "0800 131 3013"}, {"name": "Tshwane Water", "note": "Pretoria metro", "type": "call", "value": "012 358 9999"}, {"name": "Ekurhuleni Water", "note": "East Rand metro", "type": "call", "value": "0860 543 000"}, {"name": "Nelson Mandela Bay", "note": "Gqeberha water updates", "type": "link", "value": "https://www.nelsonmandelabay.gov.za"}], "title": "Water"}, "weather": {"icon": "\ud83c\udf26\ufe0f", "items": [{"name": "SA Weather Service", "note": "Official warnings", "type": "link", "value": "https://www.weathersa.co.za"}, {"name": "SAWS WhatsApp", "note": "Official warning line", "type": "whatsapp", "value": "0636060001"}], "title": "Weather \u0026 Disasters"}}}, "status": {"air": {"aqi": 168, "band": "severe", "co": 130.0, "label": "Unhealthy", "no2": 12.6, "o3": 104.0, "pm10": 48.3, "pm2_5": 42.7, "so2": 39.6, "source": "Open-Meteo Air Quality"}, "electricity": {"esp": null, "note": "South Africa passed 365 days without load-shedding in May 2026 and the winter outlook (Apr\u2013Aug 2026) is stable. Note: \u0027load reduction\u0027 (targeted cuts) still occurs in some Gauteng areas with illegal connections or overloaded lines. Stage shown is the live national status.", "status": {"label": "No load-shedding", "source": "Eskom", "stage": 0}}, "place": {"lat": -33.92584, "lon": 18.42322, "match": {"admin1": "Western Cape", "admin2": "City of Cape Town", "lat": -33.92584, "lon": 18.42322, "name": "Cape Town"}, "name": "Cape Town, Western Cape"}, "transport": {"links": [{"name": "Gautrain", "note": "Live departures in app", "url": "https://www.gautrain.co.za"}, {"name": "Prasa (Metrorail)", "note": "Service notices", "url": "https://www.prasa.com"}, {"name": "JRA roadworks", "note": "Road closures \u0026 repairs", "url": "https://www.jra.org.za"}], "notices": [{"detail": "Last major disruption: Gauteng taxi strike, July 2023 (province-wide, ~7 days).", "source": "public reporting", "title": "No active strike notices on record"}, {"detail": "Prasa/ Gautrain run their own timetables \u2014 verify before travelling.", "source": "prasa.com / gautrain.co.za", "title": "Rail services"}]}, "updated_at": "2026-08-02T13:29:44+00:00", "water": {"context": "Context (verified from public reporting, Aug 2026): Rand Water ran two winter maintenance phases in May\u2013Jul 2026 affecting the Central, Commando, Deep South, Midrand, Randburg, Roodepoort, Sandton and Soweto systems; after phase 2 (17 Jul) supply stabilisation took several days and parts of Joburg went 12+ days without water in June. Always verify current status with the official channels above.", "official": [{"name": "Joburg Water fault line", "note": "Report bursts/leaks (24h)", "type": "call", "value": "0860 562 874"}, {"name": "Joburg Water WhatsApp", "note": "SMS/WhatsApp for logged faults", "type": "whatsapp", "value": "079 769 1333"}, {"name": "Joburg Water website", "note": "Outage notices \u0026 map", "type": "link", "value": "https://www.johannesburgwater.co.za"}, {"name": "Rand Water", "note": "Bulk supply \u0026 maintenance schedules", "type": "link", "value": "https://www.randwater.co.za"}, {"name": "City of Joburg", "note": "Municipal service updates", "type": "link", "value": "https://www.joburg.org.za"}], "reports": []}, "weather": {"advisories": [], "current": {"desc": "Clear sky", "feels": 19.3, "gusts": 35.3, "humidity": 47, "icon": "\u2600\ufe0f", "temp": 20.7, "wind": 7.8}, "daily": [{"code": 3, "date": "08-02", "gusts": 36.0, "icon": "\u2601\ufe0f", "precip_prob": 0, "precip_sum": 0.0, "tmax": 20.9, "tmin": 10.5}, {"code": 3, "date": "08-03", "gusts": 24.1, "icon": "\u2601\ufe0f", "precip_prob": 0, "precip_sum": 0.0, "tmax": 25.6, "tmin": 10.8}, {"code": 3, "date": "08-04", "gusts": 26.3, "icon": "\u2601\ufe0f", "precip_prob": 0, "precip_sum": 0.0, "tmax": 22.6, "tmin": 11.3}], "source": "Open-Meteo"}}};
+
+/* ================= I18N ================= */
+const I18N={
+ en:{tHome:"Home",tSvc:"Services",tNews:"News",tAlerts:"Alerts",tMore:"More",noLs:"No load-shedding",
+  stage:"Stage",unknown:"Unknown",repT:"Report something we missed",repArea:"Area / suburb",
+  repMsg:"What's happening? e.g. no water since 6am",repName:"Your name (optional)",cancel:"Cancel",
+  send:"Send report",sent:"Report sent — thank you!",needArea:"Please enter the area name.",
+  err:"Something went wrong — try again.",addArea:"Add a location to watch",ph:"Search suburb / town…",
+  useLoc:"Finding your location…",upd:"Updated",attach:"Attach photo",photoHint:"📷 Add a photo (optional, under 300KB)",
+  confirm:"Confirm",liveOnly:"Available in live mode (run the app)",saved:"Saved!",removed:"Removed",
+  nothing:"Nothing here yet",refresh:"Refresh",areas:"My areas",addBtn:"Add location",
+  current:"Now",feels:"Feels",hum:"Humidity",wind:"Wind",gust:"Gust",air:"Air quality",good:"Good",
+  moderate:"Moderate",unhealthy:"Unhealthy",danger:"Danger",elec:"Electricity",water:"Water",
+  weather:"Weather",transport:"Transport",community:"Community reports",official:"Official channels",
+  context:"Context",notices:"Notices",links:"Links",report:"Report an issue",miss:"Missing something? Report it",
+  checklists:"Know what to do",emergency:"Emergency & safety",newsFeed:"News & updates",allNews:"All",
+  socialOnly:"Social",newsOnly:"News",areaAll:"All areas",cats:"Categories",srcStatus:"Data sources",
+  lastUpd:"Last updated",install:"Install app",installed:"App installed ✓",about:"About",clear:"Clear local data",
+  cleared:"Local data cleared",streak:"day streak",notifPerm:"Enable notifications",notifOn:"Notifications ON",
+  notifOff:"Notifications OFF",nEskom:"Alert me: load-shedding stage 2 or higher",nWx:"Alert me: severe weather advisories",
+  nRep:"Alert me: new community reports in my areas",nNews:"Alert me: news for my areas",waTitle:"WhatsApp alerts",
+  waDesc:"Get a ready-made summary you can send to your own WhatsApp (works without any account):",
+  waBtn:"Send to WhatsApp",waDigest:"Morning digest",hist:"Notification history",histEmpty:"No notifications yet",
+  noLogin:"No login needed — everything is stored on your phone.",demo:"Preview mode: full interactivity works when you run the app locally."},
+ zu:{tHome:"Ikhaya",tSvc:"Izinsiza",tNews:"Izindaba",tAlerts:"Izaziso",tMore:"Okunye",noLs:"Akukho ukunqanyulwa",
+  stage:"Isigaba",unknown:"Akwaziwa",repT:"Bika into esiyishiyile",repArea:"Indawo",repMsg:"Kwenzakalani? Isb. akukho manzi",
+  repName:"Igama (ngokuzithandela)",cancel:"Yeka",send:"Thumela",sent:"Kuthunyelwe — ngiyabonga!",needArea:"Faka igama lendawo.",
+  err:"Kukhona okungahambanga — zama futhi.",addArea:"Engeza indawo",ph:"Sesha indawo…",useLoc:"Kutholwa indawo…",
+  upd:"Kubuyekezwe",attach:"Faka isithombe",photoHint:"📷 Isithombe (okukhethwayo)",confirm:"Qinisekisa",
+  liveOnly:"Kusebenza kuphela kumodi ebukhoma",saved:"Kugciniwe!",removed:"Kususiwe",nothing:"Akukho okwamanje",
+  refresh:"Vuselela",areas:"Izindawo zami",addBtn:"Engeza indawo",current:"Manje",feels:"Kuzwakala",hum:"Umswakama",
+  wind:"Umoya",gust:"Umlo",air:"Ikhwalithi yomoya",elec:"Ugesi",water:"Amanzi",weather:"Isimo sezulu",
+  transport:"Ezokuthutha",community:"Imibiko yomphakathi",official:"Imithombo esemthethweni",context:"Umongo",
+  notices:"Izaziso",links:"Izixhumanisi",report:"Bika inkinga",miss:"Kukhona okungakhonjisiwe? Bika",
+  checklists:"Ukwazi okumele ukwenze",emergency:"Usizo oluphuthumayo",newsFeed:"Izindaba",allNews:"Konke",
+  srcStatus:"Imithombo yedatha",lastUpd:"Kugcine ukubuyekezwa",install:"Faka uhlelo",installed:"Kufakiwe ✓",
+  about:"Mayelana",clear:"Sula idatha",cleared:"Idatha isuliwe",streak:"izinsuku zilandelana",
+  notifPerm:"Vula izaziso",notifOn:"Izaziso ZIVULIWE",notifOff:"Izaziso ZIVALIWE",
+  nEskom:"Ngazise: ukunqanyulwa isigaba 2 noma ngaphezulu",nWx:"Ngazise: isimo sezulu esibi",
+  nRep:"Ngazise: imibiko emisha endaweni yami",nNews:"Ngazise: izindaba zendawo yami",
+  waTitle:"Izaziso ze-WhatsApp",waDesc:"Thola isifinyezo osithumela ku-WhatsApp yakho:",
+  waBtn:"Thumela ku-WhatsApp",waDigest:"Isifinyezo sasekuseni",hist:"Umlando wezaziso",
+  histEmpty:"Azikho izaziso okwamanje",noLogin:"Akukho ukungena ngemfihlo — konke kugcinwa efonini yakho.",
+  restored:"Amanzi abuyile",noWater:"Akukho manzi",lowPress:"Ingcindezi ephansi",leak:"Ukuvuza",powerOut:"Ugesi unqanyuliwe",route:"Ezokuthutha",other:"Okunye",
+  noAdv:"Azikho izexwayiso zezulu ezinzima okwamanje",socialOnly:"Umphakathi",newsOnly:"Izindaba",areaAll:"Zonke izindawo",},
+ xh:{tHome:"Ikhaya",tSvc:"Iinkonzo",tNews:"Iindaba",tAlerts:"Izaziso",tMore:"Okunye",noLs:"Akukho kucinywa",
+  stage:"Inqanaba",unknown:"Ayaziwa",repT:"Xela into esiyishiyileyo",repArea:"Indawo",repMsg:"Kwenzeka ntoni?",
+  repName:"Igama (ngokuzithandela)",cancel:"Rhoxisa",send:"Thumela",sent:"Ithunyelwe — enkosi!",needArea:"Faka igama lendawo.",
+  err:"Kukho into engahambanga — zama kwakhona.",addArea:"Yongeza indawo",ph:"Khangela indawo…",useLoc:"Kufunyanwa indawo…",
+  upd:"Ihlaziywe",attach:"Faka ifoto",photoHint:"📷 Ifoto (okukhethwayo)",confirm:"Qinisekisa",
+  liveOnly:"Isebenza kuphela kwimodi ephilayo",saved:"Igonjiwe!",removed:"Isusiwe",nothing:"Akukho okwangoku",
+  refresh:"Hlaziya",areas:"Iindawo zam",addBtn:"Yongeza indawo",current:"Ngoku",feels:"Kuvakala",hum:"Ukufuma",
+  wind:"Umoya",gust:"Uqhwithela",air:"Umgangatho womoya",elec:"Umbane",water:"Amanzi",weather:"Imozulu",
+  transport:"Ezothutho",community:"Iingxelo zoluntu",official:"Amajelo asemthethweni",context:"Umxholo",
+  notices:"Izaziso",links:"Amakhonkco",report:"Xela ingxaki",miss:"Kukho into engekho? Xela",
+  checklists:"Yazi into omele uyenze",emergency:"Uncedo oluphuthumayo",newsFeed:"Iindaba",allNews:"Zonke",
+  srcStatus:"Imithombo yedatha",lastUpd:"Igqibele ukuhlaziywa",install:"Faka usetyenziso",installed:"Ifakiwe ✓",
+  about:"Malunga",clear:"Cima idatha",cleared:"Idatha icinyiwe",streak:"iintsuku ezilandelelanayo",
+  notifPerm:"Vula izaziso",notifOn:"Izaziso ZIVULIWE",notifOff:"Izaziso ZIVALIWE",
+  nEskom:"Ndazise: ukucinywa kwenqanaba 2 okanye ngaphezulu",nWx:"Ndazise: imozulu enobungozi",
+  nRep:"Ndazise: iingxelo ezintsha kwindawo yam",nNews:"Ndazise: iindaba zendawo yam",
+  waTitle:"Izaziso ze-WhatsApp",waDesc:"Fumana isishwankathelo osithumela kwi-WhatsApp yakho:",
+  waBtn:"Thumela kwi-WhatsApp",waDigest:"Isishwankathelo sasekuseni",hist:"Imbali yezaziso",
+  histEmpty:"Akukho zizaziso okwangoku",noLogin:"Akukho ukungena — konke kugcinwa kwifowuni yakho.",
+  restored:"Amanzi abuyile",noWater:"Akukho manzi",lowPress:"Uxinzelelo oluphantsi",leak:"Ukuvuza",powerOut:"Umbane ucinyiwe",route:"Ezothutho",other:"Okunye",
+  noAdv:"Akukho zilumkiso zemo zulu ezinzima okwangoku",socialOnly:"Uluntu",newsOnly:"Iindaba",areaAll:"Zonke iindawo",},
+ st:{tHome:"Lapha",tSvc:"Litšebeletso",tNews:"Litia",tAlerts:"Litsebiso",tMore:"Tse ling",noLs:"Ha ho khaoloa",
+  stage:"Mokhahlelo",unknown:"Ha ho tsejoe",repT:"Tlaleha ntho eo re e hlolositseng",repArea:"Sebaka",
+  repMsg:"Ho etsahalang?",repName:"Lebitso (ka boithatelo)",cancel:"Hlakola",send:"Romela",sent:"E rometsoe — kea leboha!",
+  needArea:"Ka kopo kenya lebitso la sebaka.",err:"Ho na le phoso — leka hape.",addArea:"Kenya sebaka",ph:"Batla sebaka…",
+  useLoc:"Ho batloa sebaka…",upd:"E ntlafalitsoe",attach:"Kenya foto",photoHint:"📷 Foto (ka boithatelo)",
+  confirm:"Netefatsa",liveOnly:"E sebetsa feela ka mokhoa o phelang",saved:"E bolokiloe!",removed:"E tlositsoe",
+  nothing:"Ha ho letho hona joale",refresh:"Ntlafatsa",areas:"Libaka tsa ka",addBtn:"Kenya sebaka",
+  current:"Hona joale",feels:"Ho utloahala",hum:"Mongobo",wind:"Moea",gust:"Meea e matla",air:"Boleng ba moea",
+  elec:"Motlakase",water:"Metsi",weather:"Boemo ba leholimo",transport:"Lipalangoang",community:"Litlaleho tsa sechaba",
+  official:"Lits'ebeletso tsa semmuso",context:"Moelelo",notices:"Litsebiso",links:"Lihokelo",report:"Tlaleha bothata",
+  miss:"Ho na le ntho e sieo? Tlaleha",checklists:"Tseba seo u lokelang ho se etsa",emergency:"Thuso ea tšohanyetso",
+  newsFeed:"Litia",allNews:"Tsohle",srcStatus:"Mehloli ea data",lastUpd:"E qetelletse ho ntlafatsoa",
+  install:"Kenya sesebelisoa",installed:"E kenyelelitsoe ✓",about:"Ka",clear:"Hlakola data",
+  cleared:"Data e hlakotsoe",streak:"matsatsi a latellanang",notifPerm:"Bula litsebiso",
+  notifOn:"Litsebiso LI BULETSOE",notifOff:"Litsebiso LI KOALETSOE",
+  nEskom:"Ntsebise: khaolo ea mokhahlelo oa 2 kapa ho feta",nWx:"Ntsebise: boemo ba leholimo bo kotsi",
+  nRep:"Ntsebise: litlaleho tse ncha libakeng tsa ka",nNews:"Ntsebise: litia tsa sebaka sa ka",
+  waTitle:"Litsebiso tsa WhatsApp",waDesc:"Fumana kakaretso eo u ka e romellang ho WhatsApp ea hao:",
+  waBtn:"Romella ho WhatsApp",waDigest:"Kakaretso ea hoseng",hist:"Nalane ea litsebiso",
+  histEmpty:"Ha ho litsebiso hona joale",noLogin:"Ha ho hlokahale ho kena — tsohle li bolokiloe fonong ea hao.",
+  restored:"Metsi a khutlile",noWater:"Ha ho metsi",lowPress:"Khatello e tlase",leak:"Ho lutla",powerOut:"Motlakase o khaoloa",route:"Lipalangoang",other:"Ho hong",
+  noAdv:"Ha ho litemoso tsa boemo ba leholimo bo kotsi hajoale",socialOnly:"Sechaba",newsOnly:"Litia",areaAll:"Libaka tsohle",}};
+let LANG=localStorage.getItem("sw_lang")||"en";
+const t=k=>(I18N[LANG]&&I18N[LANG][k])||I18N.en[k]||k;
+function applyI18n(){document.querySelectorAll("[data-i18n]").forEach(el=>{const k=el.getAttribute("data-i18n");if(t(k)!==k)el.textContent=t(k);});}
+
+/* ================= STATE ================= */
+const LS_AREAS="sw_areas", LS_SET="sw_settings", LS_HIST="sw_history", LS_SEEN="sw_seen", LS_STREAK="sw_streak";
+let areas=[]; let activeIdx=0; let statusCache={}; let feedItems=[]; let svcData={air:{},services:{},checklists:{}};
+const settings=Object.assign({nEskom:true,nWx:true,nRep:true,nNews:false}, JSON.parse(localStorage.getItem(LS_SET)||"{}"));
+function saveAreas(){localStorage.setItem(LS_AREAS,JSON.stringify(areas));}
+function saveSet(){localStorage.setItem(LS_SET,JSON.stringify(settings));}
+function hist(){return JSON.parse(localStorage.getItem(LS_HIST)||"[]");}
+function pushHist(x){let h=hist();h.unshift(x);h=h.slice(0,50);localStorage.setItem(LS_HIST,JSON.stringify(h));}
+function seenKey(a,k){return "sw:"+a+":"+k;}
+function esc(s){const d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML;}
+function toast(m){const el=document.getElementById("toast");el.textContent=m;el.style.display="block";clearTimeout(el._t);el._t=setTimeout(()=>el.style.display="none",3200);}
+function timeAgo(iso){if(!iso)return"";const d=new Date(iso);const s=(Date.now()-d.getTime())/1000;
+  if(s<60)return"now";if(s<3600)return Math.floor(s/60)+"m";if(s<86400)return Math.floor(s/3600)+"h";
+  return Math.floor(s/86400)+"d";}
+async function jget(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json();}
+function live(){if(!STATIC)return true;toast(t("liveOnly"));return false;}
+
+/* ================= AREAS ================= */
+function initAreas(){
+  try{areas=JSON.parse(localStorage.getItem(LS_AREAS)||"[]");}catch(e){areas=[];}
+  if(!areas.length)areas=[{name:"Soweto",lat:-26.26781,lon:27.85849}];
+  if(!areas.find(a=>a.name==="Johannesburg"))areas.push({name:"Johannesburg",lat:-26.2041,lon:28.0473});
+  activeIdx=0;saveAreas();
+}
+function renderAreasBar(){
+  const bar=document.getElementById("areasBar");
+  bar.innerHTML=areas.map((a,i)=>`<button class="chip ${i===activeIdx?"active":""}" data-i="${i}">
+    <span>📍 ${esc(a.name)}</span><span class="x" data-del="${i}" title="Remove">✕</span></button>`).join("")
+    +`<button class="chip add" id="addChip">＋ ${t("addBtn")}</button>`;
+  bar.querySelectorAll(".chip[data-i]").forEach(b=>b.addEventListener("click",e=>{
+    if(e.target.dataset.del!==undefined){removeArea(+e.target.dataset.del);return;}
+    activeIdx=+b.dataset.i;renderAreasBar();renderHome();
+  }));
+  bar.querySelectorAll("[data-del]").forEach(x=>x.addEventListener("click",e=>{e.stopPropagation();removeArea(+x.dataset.del);}));
+  document.getElementById("addChip").onclick=openAddModal;
+}
+function removeArea(i){
+  if(areas.length<=1){toast(t("removed"));return;}
+  areas.splice(i,1);if(activeIdx>=areas.length)activeIdx=0;saveAreas();renderAreasBar();renderHome();
+  toast(t("removed"));
+}
+
+/* ================= ADD AREA MODAL ================= */
+let addTimer=null;
+function openAddModal(){
+  document.getElementById("addOverlay").classList.add("open");
+  document.getElementById("addQ").value="";document.getElementById("addSuggest").innerHTML="";
+  setTimeout(()=>document.getElementById("addQ").focus(),50);
+}
+function addArea(a){
+  if(areas.find(x=>x.name.toLowerCase()===a.name.toLowerCase())){toast(t("saved"));return;}
+  areas.push(a);activeIdx=areas.length-1;saveAreas();renderAreasBar();renderHome();toast(t("saved"));
+}
+document.getElementById("addQ").addEventListener("input",e=>{
+  clearTimeout(addTimer);const v=e.target.value.trim();const box=document.getElementById("addSuggest");
+  if(v.length<3){box.innerHTML="";return;}
+  addTimer=setTimeout(async()=>{
+    try{const{results}=await jget("/api/areas?q="+encodeURIComponent(v));
+      box.innerHTML=results.slice(0,6).map(r=>`<li data-lat="${r.lat}" data-lon="${r.lon}"><b>${esc(r.name)}</b><small>${esc(r.admin1||"")}${r.admin2?" · "+esc(r.admin2):""}</small></li>`).join("");
+      box.querySelectorAll("li").forEach(li=>li.onclick=()=>{
+        addArea({name:li.querySelector("b").textContent,lat:+li.dataset.lat,lon:+li.dataset.lon});
+        document.getElementById("addOverlay").classList.remove("open");
+      });
+    }catch(e){box.innerHTML="";}
+  },350);
+});
+document.getElementById("addGeo").onclick=()=>{
+  if(!navigator.geolocation){toast(t("err"));return;}toast(t("useLoc"));
+  navigator.geolocation.getCurrentPosition(p=>{
+    addArea({name:"My location",lat:+p.coords.latitude.toFixed(5),lon:+p.coords.longitude.toFixed(5)});
+    document.getElementById("addOverlay").classList.remove("open");
+  },()=>toast(t("err")),{timeout:8000});
+};
+document.getElementById("addCancel").onclick=()=>document.getElementById("addOverlay").classList.remove("open");
+
+/* ================= TABS ================= */
+document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");
+  const tab=b.dataset.tab;
+  document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+  document.getElementById("sec-"+tab).classList.add("active");
+  if(tab==="home")renderHome();
+  if(tab==="services")renderServices();
+  if(tab==="news")renderNews();
+  if(tab==="alerts")renderAlerts();
+  if(tab==="more")renderMore();
+  window.scrollTo(0,0);
+});
+
+/* ================= NATIONAL PILL ================= */
+function renderPill(stage){
+  const dot=document.getElementById("ndot"),lab=document.getElementById("nlabel");
+  if(stage===0){dot.className="dot green";lab.textContent=t("noLs");}
+  else if(stage==="unknown"||stage==null){dot.className="dot gray";lab.textContent=t("unknown");}
+  else{dot.className="dot amber";lab.textContent=t("stage")+" "+stage;}
+}
+
+/* ================= DATA LOAD ================= */
+async function fetchStatus(area){
+  const u="/api/status?q="+encodeURIComponent(area.name)+(area.lat!=null&&area.name==="My location"?`&lat=${area.lat}&lon=${area.lon}`:"");
+  const d=await jget(u);statusCache[area.name]=d;return d;
+}
+async function loadAll(){
+  try{
+    const areasNow=[...areas];
+    await Promise.all(areasNow.map(a=>fetchStatus(a).catch(()=>null)));
+    try{feedItems=(await jget("/api/feed?limit=80")).items||[];}catch(e){feedItems=[];}
+    try{svcData=await jget("/api/services");}catch(e){}
+    const d=statusCache[areas[activeIdx]?.name]||{};
+    renderPill(d.electricity?.status?.stage);
+    renderHome();renderNews();renderServices();
+    checkNotifications();
+    bumpStreak();
+    if(document.getElementById("sec-alerts").classList.contains("active"))renderAlerts();
+  }catch(e){toast(t("err"));}
+}
+function bumpStreak(){
+  try{const s=JSON.parse(localStorage.getItem(LS_STREAK)||'{"d":"","c":0}');
+    const today=new Date().toDateString();
+    if(s.d!==today){s.c=(new Date(Date.now()-864e5).toDateString()===s.d)?s.c+1:1;s.d=today;}
+    localStorage.setItem(LS_STREAK,JSON.stringify(s));
+  }catch(e){}
+}
+
+/* ================= HOME ================= */
+function kindLabel(k){const m={restored:t("restored")||"restored",no_water:t("noWater")||"No water",low_pressure:t("lowPress")||"Low pressure",leak:t("leak")||"Leak",power_out:t("powerOut")||"Power out",route:t("route")||"Route",other:t("other")||"Other"};return m[k]||k;}
+const KIND_LABELS={restored:"restored",no_water:"noWater",low_pressure:"lowPress",leak:"leak",power_out:"powerOut",route:"route",other:"other"};
+
+function renderHome(){
+  const el=document.getElementById("sec-home");
+  const area=areas[activeIdx];if(!area){el.innerHTML=`<div class="empty">${t("nothing")}</div>`;return;}
+  const d=statusCache[area.name]||{};
+  el.innerHTML=`<div class="loading">${t("refresh")}…</div>`;
+  const w=d.weather,air=d.air,elec=d.electricity,water=d.water,tr=d.transport;
+  /* hero */
+  let hero=`<div class="hero">
+    <div class="top">
+      <div><div class="big">${w&&w.current?w.current.temp+"°":""}</div>
+        <div class="desc">${esc(area.name)} · ${w&&w.current?esc(w.current.desc):""}</div></div>
+      <div class="side">
+        ${air?`<div class="aqi"><span class="badge ${air.band==="good"?"ok":air.band==="moderate"?"warn":"severe"}">${t("air")}: ${air.aqi} ${esc(air.label)}</span></div>`:""}
+        ${elec?`<div style="margin-top:6px"><span class="badge ${elec.status.stage===0?"ok":elec.status.stage==="unknown"?"info":"warn"}">⚡ ${esc(elec.status.label)}</span></div>`:""}
+      </div>
+    </div>
+    <div class="mini">
+      ${w&&w.daily?w.daily.map(x=>`<div class="m">${x.icon}<br>${esc(x.date)}<br><b>${x.tmax}°/${x.tmin}°</b><br>☔${x.precip_prob}%</div>`).join(""):""}
+      ${w&&w.current?`<div class="m">${t("feels")}<br><b>${w.current.feels}°</b><br>${t("hum")} ${w.current.humidity}%</div>`:""}
+      ${w&&w.current?`<div class="m">${t("wind")}<br><b>${w.current.wind}</b><br>${t("gust")} ${w.current.gusts}</div>`:""}
+    </div>
+    ${w&&w.advisories&&w.advisories.length?`<div class="adv">${w.advisories.map(a=>`<div class="chipadv ${a.level}">${a.icon} ${esc(a.text)}</div>`).join("")}</div>`
+      :`<div class="adv"><div class="chipadv warn">✅ ${esc(t("noAdv"))}</div></div>`}
+    <div class="note">${t("upd")}: ${esc((d.updated_at||"").replace("T"," ").slice(0,16))}</div>
+  </div>`;
+  /* electricity card */
+  let elecCard=`<div class="card"><h2>⚡ ${t("elec")}</h2>
+    <div class="row"><span class="k">${t("elec")}</span><span class="badge ${elec&&elec.status.stage===0?"ok":elec&&elec.status.stage==="unknown"?"info":"warn"}">${esc(elec?elec.status.label:t("unknown"))}</span></div>
+    ${elec&&elec.esp?`<div class="note">${esc(elec.esp.source)}: ${esc(elec.esp.stage)}</div>`:""}
+    <div class="note">${esc(elec?elec.note:"")}</div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm" onclick="openReport('power_out')">${t("report")}</button>
+      <button class="btn sm" onclick="openReport('other')">${t("miss")}</button></div></div>`;
+  /* water card */
+  const reps=(water&&water.reports)||[];
+  const repHtml=reps.length?reps.map(r=>`<div class="report"><div class="meta">
+      <span class="repkind ${esc(r.kind)}">${esc(r.area)} · ${esc(kindLabel(r.kind))}</span>
+      <span>${timeAgo(r.created)} · ${r.confirms}✓</span></div>
+      ${r.message?`<div class="msg">${esc(r.message)}</div>`:""}
+      <div style="margin-top:6px"><button class="btn sm" onclick="confirmRep(${r.id})">${t("confirm")}</button></div></div>`).join("")
+    :`<div class="empty">${t("nothing")} — ${t("community")}</div>`;
+  const offLinks=((water&&water.official)||[]).map(o=>{
+    if(o.type==="call")return`<a href="tel:${esc(o.value.replace(/\s/g,""))}">📞 ${esc(o.name)} — ${esc(o.value)}<small>${esc(o.note||"")}</small></a>`;
+    if(o.type==="whatsapp")return`<a href="https://wa.me/${esc(o.value.replace(/\D/g,""))}">💬 ${esc(o.name)} — ${esc(o.value)}<small>${esc(o.note||"")}</small></a>`;
+    return`<a href="${esc(o.value)}" target="_blank" rel="noopener">🔗 ${esc(o.name)}<small>${esc(o.note||"")}</small></a>`;
+  }).join("");
+  let waterCard=`<div class="card"><h2>🚰 ${t("water")}</h2>
+    <div class="row"><span class="k">${t("community")}</span><span class="badge ${reps.length?"warn":"ok"}">${reps.length} ${t("upd")}</span></div>
+    ${repHtml}
+    <div style="margin-top:10px"><b style="font-size:.85rem">${t("official")}</b><div class="links">${offLinks}</div></div>
+    <div class="note"><b>${t("context")}:</b> ${esc((water&&water.context)||"")}</div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm primary" onclick="openReport('no_water')">＋ ${t("report")}</button>
+      <button class="btn sm" onclick="openReport('other')">${t("miss")}</button></div></div>`;
+  /* weather card */
+  let wxCard=`<div class="card"><h2>🌦️ ${t("weather")}</h2>`;
+  if(w&&w.current){
+    wxCard+=`<div class="row"><span class="k">${t("current")}</span><span>${w.current.icon} <b>${w.current.temp}°C</b> — ${esc(w.current.desc)}</span></div>
+      <div class="row"><span class="k">${t("feels")} / ${t("hum")}</span><span>${w.current.feels}°C / ${w.current.humidity}%</span></div>
+      <div class="row"><span class="k">${t("wind")} / ${t("gust")}</span><span>${w.current.wind} / ${w.current.gusts} km/h</span></div>`;
+    if(w.daily)wxCard+=`<div class="row"><span class="k">3-day</span><span>${w.daily.map(x=>`${x.icon} ${esc(x.date)} ${x.tmax}°/${x.tmin}°`).join(" · ")}</span></div>`;
+  }else{wxCard+=`<div class="note">${t("err")}</div>`;}
+  if(air)wxCard+=`<div class="row"><span class="k">${t("air")}</span><span class="badge ${air.band==="good"?"ok":air.band==="moderate"?"warn":"severe"}">AQI ${air.aqi} — ${esc(air.label)}</span></div>
+    <div class="note">PM2.5: ${air.pm2_5??"—"} · PM10: ${air.pm10??"—"} · O₃: ${air.o3??"—"} · NO₂: ${air.no2??"—"} (${esc(air.source)})</div>`;
+  wxCard+=`<div style="margin-top:10px"><button class="btn sm" onclick="openReport('other')">${t("miss")}</button></div></div>`;
+  /* transport card */
+  const trN=((tr&&tr.notices)||[]).map(n=>`<div class="report"><div class="meta"><span>${esc(n.title)}</span></div><div class="msg">${esc(n.detail)}</div></div>`).join("");
+  const trL=((tr&&tr.links)||[]).map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener">🔗 ${esc(l.name)}<small>${esc(l.note||"")}</small></a>`).join("");
+  let trCard=`<div class="card"><h2>🚌 ${t("transport")}</h2>${trN||`<div class="empty">${t("nothing")}</div>`}
+    <div class="links">${trL}</div>
+    <div style="margin-top:10px"><button class="btn sm" onclick="openReport('route')">${t("report")}</button></div></div>`;
+  el.innerHTML=hero+elecCard+waterCard+wxCard+trCard;
+}
+
+/* ================= REPORT MODAL ================= */
+let rKind="no_water";let rPhoto="";
+function openReport(kind){
+  if(!live())return;
+  rKind=kind||"no_water";rPhoto="";
+  const area=areas[activeIdx];
+  document.getElementById("rArea").value=area?area.name.split(",")[0]:"";
+  document.getElementById("rMsg").value="";document.getElementById("rName").value="";
+  const box=document.getElementById("kinds");
+  box.innerHTML=Object.keys(KIND_LABELS).map(k=>`<button data-k="${k}" class="${k===rKind?"active":""}" onclick="setKind('${k}')">${t(KIND_LABELS[k])}</button>`).join("");
+  document.getElementById("overlay").classList.add("open");
+}
+function setKind(k){rKind=k;document.querySelectorAll("#kinds button").forEach(b=>b.classList.toggle("active",b.dataset.k===k));}
+document.getElementById("photoBtn").onclick=()=>document.getElementById("rPhoto").click();
+document.getElementById("rPhoto").addEventListener("change",e=>{
+  const f=e.target.files[0];if(!f)return;
+  if(f.size>300000){toast(t("err"));return;}
+  const rd=new FileReader();rd.onload=()=>{rPhoto=rd.result;toast(t("attach")+" ✓");};rd.readAsDataURL(f);
+});
+async function sendReport(){
+  if(!live())return;
+  const area=document.getElementById("rArea").value.trim();
+  if(area.length<3){toast(t("needArea"));return;}
+  const a=areas[activeIdx];
+  const body={area,kind:rKind,message:document.getElementById("rMsg").value.trim(),
+    reporter:document.getElementById("rName").value.trim(),photo:rPhoto,
+    lat:a&&a.lat!=null?a.lat:null,lon:a&&a.lon!=null?a.lon:null};
+  try{
+    await fetch("/api/report",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    document.getElementById("overlay").classList.remove("open");toast(t("sent"));
+    const d=await fetchStatus(a);renderHome();checkNotifications();
+  }catch(e){toast(t("err"));}
+}
+async function confirmRep(id){
+  if(!live())return;
+  try{await fetch("/api/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+    const d=await fetchStatus(areas[activeIdx]);renderHome();toast("✓");}
+  catch(e){toast(t("err"));}
+}
+document.getElementById("cancel").onclick=()=>document.getElementById("overlay").classList.remove("open");
+document.getElementById("go").onclick=sendReport;
+document.getElementById("fab").onclick=()=>openReport("other");
+
+/* ================= SERVICES ================= */
+function renderServices(){
+  const el=document.getElementById("sec-services");
+  const S=svcData.services||{};
+  let html=`<h2 style="margin-bottom:10px">🧰 ${t("tSvc")}</h2>`;
+  const order=["electricity","water","transport","weather","emergency"];
+  order.forEach(key=>{
+    const s=S[key];if(!s)return;
+    html+=`<div class="card"><h2>${s.icon} ${t(key==="emergency"?"emergency":key)}</h2><div class="links">`;
+    (s.items||[]).forEach(it=>{
+      if(it.type==="call")html+=`<a href="tel:${esc(it.value.replace(/\s/g,""))}">📞 ${esc(it.name)} — <b>${esc(it.value)}</b><small>${esc(it.note||"")}</small></a>`;
+      else if(it.type==="whatsapp")html+=`<a href="https://wa.me/${esc(it.value.replace(/\D/g,""))}">💬 ${esc(it.name)} — <b>${esc(it.value)}</b><small>${esc(it.note||"")}</small></a>`;
+      else html+=`<a href="${esc(it.value)}" target="_blank" rel="noopener">🔗 ${esc(it.name)}<small>${esc(it.note||"")}</small></a>`;
+    });
+    html+=`</div></div>`;
+  });
+  /* checklists */
+  html+=`<div class="card"><h2>📋 ${t("checklists")}</h2>`;
+  const C=svcData.checklists||{};
+  Object.values(C).forEach(cl=>{
+    html+=`<details class="checklist"><summary>${esc(cl.title)}</summary><ol>${cl.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol></details>`;
+  });
+  html+=`</div>`;
+  html+=`<div class="card"><h2>📡 ${t("srcStatus")}</h2>
+    <div class="row"><span class="k">Eskom (load-shedding)</span><span class="badge ok">${t("upd")}</span></div>
+    <div class="row"><span class="k">Open-Meteo (weather & air)</span><span class="badge ok">${t("upd")}</span></div>
+    <div class="row"><span class="k">Google News SA · Citizen · BusinessTech</span><span class="badge ok">${t("upd")}</span></div>
+    <div class="row"><span class="k">Mastodon (social)</span><span class="badge ${feedItems.some(i=>i.type==="social")?"ok":"warn"}">${feedItems.some(i=>i.type==="social")?"live":"degraded"}</span></div>
+    <div class="row"><span class="k">Community reports</span><span class="badge ok">${t("upd")}</span></div>
+    <div class="note">${t("upd")}: ${new Date().toISOString().replace("T"," ").slice(0,16)}</div></div>`;
+  el.innerHTML=html;
+}
+
+/* ================= NEWS ================= */
+let newsCat="all",newsType="all",newsArea="all",newsQ="";
+const CATS=["electricity","water","weather","transport","safety","economy","other"];
+function renderNews(){
+  const el=document.getElementById("sec-news");
+  let items=feedItems;
+  if(newsType==="news")items=items.filter(i=>i.type==="news");
+  if(newsType==="social")items=items.filter(i=>i.type==="social");
+  if(newsCat!=="all")items=items.filter(i=>i.category===newsCat);
+  if(newsArea!=="all")items=items.filter(i=>(i.areas||[]).includes(newsArea));
+  if(newsQ)items=items.filter(i=>(i.title+" "+i.body).toLowerCase().includes(newsQ));
+  const areaOpts=`<option value="all">${t("areaAll")}</option>`+REGIONS.filter(r=>items.some(i=>i.areas.includes(r))).map(r=>`<option value="${r}" ${newsArea===r?"selected":""}>${r}</option>`).join("");
+  let html=`<h2 style="margin-bottom:8px">📰 ${t("newsFeed")}</h2>
+    <div class="filterbar">
+      <button class="fchip ${newsType==="all"?"active":""}" data-nt="all">${t("allNews")}</button>
+      <button class="fchip ${newsType==="news"?"active":""}" data-nt="news">${t("newsOnly")}</button>
+      <button class="fchip ${newsType==="social"?"active":""}" data-nt="social">${t("socialOnly")}</button>
+    </div>
+    <div class="filterbar">
+      <button class="fchip ${newsCat==="all"?"active":""}" data-nc="all">${t("allNews")}</button>
+      ${CATS.map(c=>`<button class="fchip ${newsCat===c?"active":""}" data-nc="${c}">${esc(c)}</button>`).join("")}
+    </div>
+    <div class="searchrow">
+      <input id="newsQ" placeholder="Filter news…" value="${esc(newsQ)}">
+      <select id="newsArea" style="background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:0 10px;font-size:.85rem">${areaOpts}</select>
+    </div>`;
+  if(!items.length)html+=`<div class="empty">${t("nothing")}</div>`;
+  items.slice(0,60).forEach(i=>{
+    html+=`<div class="news">
+      <div class="top"><span class="badge ${i.category==="electricity"?"warn":i.category==="water"?"severe":i.category==="weather"?"info":i.category==="safety"?"severe":i.category==="economy"?"ok":"neutral"}">${esc(i.category)}</span>
+        <span class="badge ${i.type==="social"?"info":"neutral"}">${i.type==="social"?"🐦 "+t("socialOnly"):"📰 "+t("newsOnly")}</span>
+        <span class="src">${esc(i.source)} · ${timeAgo(i.time)}</span></div>
+      <h3><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a></h3>
+      ${i.body?`<p>${esc(i.body.slice(0,220))}</p>`:""}
+      <div class="top" style="margin-top:6px">${(i.areas||[]).map(a=>`<span class="areaTag">📍 ${esc(a)}</span>`).join("")}</div>
+    </div>`;
+  });
+  el.innerHTML=html;
+  el.querySelectorAll("[data-nt]").forEach(b=>b.onclick=()=>{newsType=b.dataset.nt;renderNews();});
+  el.querySelectorAll("[data-nc]").forEach(b=>b.onclick=()=>{newsCat=b.dataset.nc;renderNews();});
+  const q=document.getElementById("newsQ");q.oninput=()=>{newsQ=q.value.toLowerCase();renderNews();};
+  const sel=document.getElementById("newsArea");sel.onchange=()=>{newsArea=sel.value;renderNews();};
+}
+const REGIONS=["gauteng","western cape","kwa-zulu natal","eastern cape","free state","limpopo","mpumalanga","north west","northern cape","south africa"];
+
+/* ================= ALERTS ================= */
+function renderAlerts(){
+  const el=document.getElementById("sec-alerts");
+  const perm=("Notification" in window)&&Notification.permission;
+  const on=perm==="granted";
+  let html=`<h2 style="margin-bottom:10px">🔔 ${t("tAlerts")}</h2>`;
+  /* browser notifications */
+  html+=`<div class="card"><h2>🔔 ${t("notifPerm")}</h2>
+    <button class="btn primary" id="permBtn" style="width:100%">${on?t("notifOn"):t("notifOff")}</button>
+    <div class="switch"><span>${t("nEskom")}</span><input type="checkbox" id="sEskom" ${settings.nEskom?"checked":""}></div>
+    <div class="switch"><span>${t("nWx")}</span><input type="checkbox" id="sWx" ${settings.nWx?"checked":""}></div>
+    <div class="switch"><span>${t("nRep")}</span><input type="checkbox" id="sRep" ${settings.nRep?"checked":""}></div>
+    <div class="switch"><span>${t("nNews")}</span><input type="checkbox" id="sNews" ${settings.nNews?"checked":""}></div>
+    <div class="hint">${t("noLogin")}</div></div>`;
+  /* whatsapp */
+  html+=`<div class="card"><h2>💬 ${t("waTitle")}</h2><div class="hint" style="margin-bottom:8px">${t("waDesc")}</div>`;
+  areas.forEach(a=>{
+    html+=`<div style="display:flex;gap:8px;margin:6px 0"><button class="btn sm grow" onclick="waAlert('${esc(a.name)}')">${t("waBtn")} — ${esc(a.name)}</button></div>`;
+  });
+  html+=`<button class="btn sm" onclick="waDigest()">🌅 ${t("waDigest")}</button></div>`;
+  /* history */
+  const h=hist();
+  html+=`<div class="card"><h2>🕘 ${t("hist")}</h2>`;
+  html+=h.length?h.slice(0,20).map(x=>`<div class="listrow"><div class="grow"><div style="font-size:.85rem">${esc(x.title)}</div><div class="src">${esc(x.area||"")} · ${timeAgo(x.time)}</div></div></div>`).join("")
+    :`<div class="empty">${t("histEmpty")}</div>`;
+  html+=`</div>`;
+  el.innerHTML=html;
+  const pb=document.getElementById("permBtn");
+  pb.onclick=async()=>{
+    if(!("Notification" in window)){toast(t("err"));return;}
+    const p=await Notification.requestPermission();
+    pb.textContent=p==="granted"?t("notifOn"):t("notifOff");pb.classList.toggle("primary",p==="granted");
+  };
+  document.getElementById("sEskom").onchange=e=>{settings.nEskom=e.target.checked;saveSet();};
+  document.getElementById("sWx").onchange=e=>{settings.nWx=e.target.checked;saveSet();};
+  document.getElementById("sRep").onchange=e=>{settings.nRep=e.target.checked;saveSet();};
+  document.getElementById("sNews").onchange=e=>{settings.nNews=e.target.checked;saveSet();};
+}
+function waAlert(areaName){
+  const d=statusCache[areaName]||{};
+  const lines=[`ServiceWaze — ${areaName}`];
+  if(d.electricity)lines.push(`⚡ ${d.electricity.status.label}`);
+  if(d.weather&&d.weather.current)lines.push(`🌦️ ${d.weather.current.temp}°C ${d.weather.current.desc}`);
+  if(d.weather&&d.weather.advisories&&d.weather.advisories.length)lines.push("⚠️ "+d.weather.advisories[0].text);
+  if(d.air)lines.push(`🌫️ Air AQI ${d.air.aqi} (${d.air.label})`);
+  const reps=(d.water&&d.water.reports)||[];
+  if(reps.length)lines.push(`🚰 ${reps.length} community report(s): ${reps[0].kind}`);
+  lines.push("— ServiceWaze");
+  window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(lines.join("\n")),"_blank");
+}
+function waDigest(){
+  const lines=["📋 ServiceWaze morning digest — "+new Date().toDateString()];
+  areas.forEach(a=>{
+    const d=statusCache[a.name]||{};
+    let l=`📍 ${a.name}: `;
+    l+=(d.electricity?d.electricity.status.label:"")+", ";
+    l+=(d.weather&&d.weather.current?d.weather.current.temp+"°C "+d.weather.current.desc:"");
+    if(d.weather&&d.weather.advisories&&d.weather.advisories.length)l+=", ⚠️ "+d.weather.advisories[0].text;
+    lines.push(l);
+  });
+  window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(lines.join("\n")),"_blank");
+}
+/* notifications engine */
+function checkNotifications(){
+  if(!("Notification" in window)||Notification.permission!=="granted")return;
+  areas.forEach(a=>{
+    const d=statusCache[a.name];if(!d)return;
+    if(settings.nEskom&&d.electricity&&d.electricity.status.stage>=2){
+      const k=seenKey(a.name,"eskom"+d.electricity.status.stage);
+      if(!localStorage.getItem(k)){localStorage.setItem(k,"1");
+        new Notification("⚡ "+a.name,{body:t("stage")+" "+d.electricity.status.stage+" — "+d.electricity.status.label});
+        pushHist({area:a.name,title:"⚡ "+a.name+" — "+d.electricity.status.label,time:new Date().toISOString()});}
+    }
+    if(settings.nWx&&d.weather&&d.weather.advisories){
+      d.weather.advisories.filter(x=>x.level==="severe").forEach(ad=>{
+        const k=seenKey(a.name,"wx"+ad.text.slice(0,30));
+        if(!localStorage.getItem(k)){localStorage.setItem(k,"1");
+          new Notification("⚠️ "+a.name,{body:ad.text});
+          pushHist({area:a.name,title:"⚠️ "+a.name+" — "+ad.text.slice(0,80),time:new Date().toISOString()});}
+      });
+    }
+    if(settings.nRep&&d.water&&d.water.reports){
+      d.water.reports.slice(0,3).forEach(r=>{
+        const k=seenKey(a.name,"rep"+r.id);
+        if(!localStorage.getItem(k)){localStorage.setItem(k,"1");
+          new Notification("🚰 "+a.name,{body:r.area+" — "+r.kind+(r.message?": "+r.message:"")});
+          pushHist({area:a.name,title:"🚰 "+a.name+" — "+r.kind,time:new Date().toISOString()});}
+      });
+    }
+  });
+  if(settings.nNews&&feedItems.length){
+    feedItems.slice(0,5).forEach(i=>{
+      const k=seenKey("news",i.id);
+      if(!localStorage.getItem(k)&&(i.areas||[]).some(x=>areas.some(a=>x===a.name.toLowerCase()||x==="south africa"))){
+        localStorage.setItem(k,"1");
+        new Notification("📰 "+i.category,{body:i.title});
+        pushHist({area:i.areas[0]||"SA",title:"📰 "+i.title.slice(0,80),time:new Date().toISOString()});
+      }
+    });
+  }
+}
+
+/* ================= MORE ================= */
+function renderMore(){
+  const el=document.getElementById("sec-more");
+  let s={};try{s=JSON.parse(localStorage.getItem(LS_STREAK)||'{"c":0}');}catch(e){}
+  let html=`<h2 style="margin-bottom:10px">⚙️ ${t("tMore")}</h2>
+    <div class="card"><h2>🔥 ${s.c||0} ${t("streak")}</h2>
+      <div class="hint">${t("noLogin")}</div></div>
+    <div class="card"><h2>📍 ${t("areas")}</h2>`;
+  areas.forEach((a,i)=>{
+    html+=`<div class="listrow"><div class="grow">📍 ${esc(a.name)}<div class="src">${a.lat!=null?a.lat.toFixed(4)+", "+a.lon.toFixed(4):""}</div></div>
+      <button class="btn sm" onclick="removeArea(${i})">✕</button></div>`;
+  });
+  html+=`<button class="btn sm" style="width:100%;margin-top:8px" onclick="openAddModal()">＋ ${t("addBtn")}</button></div>
+    <div class="card"><h2>💬 ${t("waTitle")}</h2><button class="btn sm" style="width:100%" onclick="waDigest()">🌅 ${t("waDigest")}</button></div>
+    <div class="card"><h2>📲 ${t("install")}</h2><button class="btn primary" id="installBtn" style="width:100%">${t("install")}</button>
+      <div class="hint">${STATIC?"":"PWA — works offline after first load."}</div></div>
+    <div class="card"><h2>ℹ️ ${t("about")}</h2>
+      <div class="hint" style="margin-bottom:6px">ServiceWaze v2.0 · live data: Eskom, Open-Meteo, Google News SA, The Citizen, BusinessTech, Mastodon · community-verified reports · ${t("noLogin")}</div>
+      <div class="note">${STATIC?t("demo"):""}</div></div>
+    <div class="card"><button class="btn warn" id="clearBtn" style="width:100%">${t("clear")}</button></div>`;
+  el.innerHTML=html;
+  const ib=document.getElementById("installBtn");
+  if(deferredPrompt){ib.onclick=async()=>{deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;ib.textContent=t("installed");};}
+  else{ib.onclick=()=>toast(STATIC?t("liveOnly"):t("installed"));ib.classList.add("primary");}
+  document.getElementById("clearBtn").onclick=()=>{
+    localStorage.clear();initAreas();renderAreasBar();location.reload();toast(t("cleared"));
+  };
+}
+let deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;});
+
+/* ================= INIT ================= */
+document.querySelectorAll(".langs button").forEach(b=>{
+  b.classList.toggle("active",b.dataset.lang===LANG);
+  b.onclick=()=>{LANG=b.dataset.lang;localStorage.setItem("sw_lang",LANG);
+    document.querySelectorAll(".langs button").forEach(x=>x.classList.remove("active"));b.classList.add("active");
+    applyI18n();renderAreasBar();renderHome();renderServices();renderNews();renderAlerts();renderMore();};
+});
+applyI18n();
+initAreas();renderAreasBar();
+if(STATIC&&BOOT&&BOOT.status){
+  statusCache[BOOT.status.place.name]=BOOT.status;
+  feedItems=BOOT.feed?BOOT.feed.items:[];
+  svcData=BOOT.services||{};
+  renderPill(BOOT.status.electricity?.status?.stage);
+  renderHome();renderServices();renderNews();
+
+}else{
+  renderHome();
+  loadAll();
+  setInterval(()=>{loadAll();},120000);
+  window.addEventListener("online",()=>{document.getElementById("offlineDot").style.display="none";loadAll();});
+  window.addEventListener("offline",()=>{document.getElementById("offlineDot").style.display="inline-block";});
+}
+if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js").catch(()=>{});}
+</script>
+</body>
+</html>

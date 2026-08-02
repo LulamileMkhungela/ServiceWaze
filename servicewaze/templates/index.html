@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<meta name="description" content="ServiceWaze — live status for electricity, water, weather, transport and news for your area. Free, low-data, no login.">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/icons/icon-180.png">
+<title>ServiceWaze — Live service status & news for your area</title>
+<style>
+  :root{--bg:#0d1117;--card:#161c26;--card2:#1c2431;--line:#2a3444;--text:#e6edf3;--muted:#9aa7b8;
+    --accent:#38bdf8;--ok:#34d399;--warn:#fbbf24;--severe:#f87171;--info:#a78bfa;--nav:#10151d;}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45;}
+  .wrap{max-width:820px;margin:0 auto;padding:10px 12px 96px;}
+  /* header */
+  header{position:sticky;top:0;z-index:20;background:rgba(13,17,23,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);padding:8px 12px;margin:-10px -12px 10px;}
+  .head{display:flex;align-items:center;gap:8px;max-width:820px;margin:0 auto;}
+  .logo{font-size:1.2rem;font-weight:800;letter-spacing:.2px;white-space:nowrap;}
+  .logo .dot{color:var(--accent);}
+  .pill{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:.74rem;font-weight:700;
+    border-radius:999px;padding:4px 10px;border:1px solid var(--line);background:var(--card2);white-space:nowrap;}
+  .pill .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  .dot.green{background:var(--ok);} .dot.amber{background:var(--warn);} .dot.red{background:var(--severe);}
+  .dot.gray{background:#6b7280;}
+  #offlineDot{display:none;width:8px;height:8px;border-radius:50%;background:#f87171;box-shadow:0 0 6px #f87171;}
+  .langs{display:flex;gap:3px;margin-left:6px;}
+  .langs button{background:var(--card2);color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:3px 7px;font-size:.68rem;cursor:pointer;}
+  .langs button.active{background:var(--accent);color:#062033;border-color:var(--accent);font-weight:800;}
+  /* areas bar */
+  .areas{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:none;}
+  .areas::-webkit-scrollbar{display:none;}
+  .chip{flex:0 0 auto;display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);
+    color:var(--text);border-radius:999px;padding:7px 14px;font-size:.85rem;cursor:pointer;max-width:220px;}
+  .chip.active{background:var(--accent);color:#062033;border-color:var(--accent);font-weight:700;}
+  .chip .x{opacity:.6;font-size:.95rem;}
+  .chip.add{color:var(--accent);border-style:dashed;}
+  /* cards */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;}
+  .card h2{font-size:1rem;display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:700;white-space:nowrap;}
+  .badge.ok{background:rgba(52,211,153,.15);color:var(--ok);}
+  .badge.warn{background:rgba(251,191,36,.15);color:var(--warn);}
+  .badge.severe{background:rgba(248,113,113,.15);color:var(--severe);}
+  .badge.info{background:rgba(167,139,250,.15);color:var(--info);}
+  .badge.neutral{background:rgba(154,167,184,.15);color:var(--muted);}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:.88rem;}
+  .row .k{color:var(--muted);}
+  .note{color:var(--muted);font-size:.76rem;margin-top:8px;}
+  .btn{background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:10px;
+    padding:9px 14px;font-size:.85rem;cursor:pointer;font-weight:600;}
+  .btn.primary{background:var(--accent);color:#062033;border:none;font-weight:800;}
+  .btn.warn{border-color:rgba(251,191,36,.5);color:var(--warn);}
+  .btn.sm{padding:6px 10px;font-size:.78rem;}
+  .btn:active{transform:scale(.98);}
+  .hero{background:linear-gradient(160deg,#12202e,#101623);border:1px solid var(--line);border-radius:16px;
+    padding:16px;margin-bottom:12px;}
+  .hero .top{display:flex;align-items:flex-start;gap:10px;}
+  .hero .big{font-size:2.6rem;font-weight:800;line-height:1;}
+  .hero .desc{font-size:.92rem;color:var(--muted);margin-top:2px;}
+  .hero .side{margin-left:auto;text-align:right;font-size:.8rem;color:var(--muted);}
+  .hero .mini{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .mini .m{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:.76rem;text-align:center;}
+  .adv{display:flex;gap:8px;margin-top:10px;flex-direction:column;}
+  .chipadv{border-radius:10px;padding:9px 11px;font-size:.8rem;display:flex;gap:8px;align-items:flex-start;}
+  .chipadv.severe{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.4);}
+  .chipadv.warn{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.35);}
+  /* reports */
+  .report{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;}
+  .report .meta{display:flex;justify-content:space-between;gap:6px;font-size:.7rem;color:var(--muted);margin-bottom:4px;flex-wrap:wrap;}
+  .report .msg{font-size:.85rem;}
+  .repkind{font-weight:700;}
+  .repkind.no_water{color:var(--severe);}.repkind.low_pressure{color:var(--warn);}.repkind.leak{color:var(--warn);}
+  .repkind.restored{color:var(--ok);}.repkind.power_out{color:var(--warn);}.repkind.route{color:var(--info);}
+  /* links */
+  .links a{color:var(--accent);display:flex;align-items:center;gap:6px;padding:6px 0;font-size:.86rem;text-decoration:none;border-bottom:1px solid rgba(42,52,68,.5);}
+  .links a:last-child{border-bottom:none;}
+  .links a small{color:var(--muted);display:block;font-size:.72rem;}
+  /* news */
+  .filterbar{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none;}
+  .filterbar::-webkit-scrollbar{display:none;}
+  .fchip{flex:0 0 auto;background:var(--card2);border:1px solid var(--line);color:var(--muted);border-radius:999px;
+    padding:6px 12px;font-size:.78rem;cursor:pointer;font-weight:600;}
+  .fchip.active{background:var(--accent);color:#062033;border-color:var(--accent);}
+  .news{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;}
+  .news .top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+  .news h3{font-size:.95rem;margin-bottom:6px;}
+  .news a{color:var(--text);text-decoration:none;}
+  .news p{color:var(--muted);font-size:.8rem;}
+  .src{font-size:.7rem;color:var(--muted);}
+  .areaTag{font-size:.66rem;background:rgba(56,189,248,.15);color:var(--accent);border-radius:6px;padding:2px 6px;}
+  /* tabs */
+  .nav{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--nav);border-top:1px solid var(--line);
+    display:flex;max-width:820px;margin:0 auto;}
+  .nav button{flex:1;background:none;border:none;color:var(--muted);padding:10px 4px 12px;font-size:.68rem;cursor:pointer;font-weight:700;}
+  .nav button .ic{font-size:1.3rem;display:block;margin-bottom:2px;}
+  .nav button.active{color:var(--accent);}
+  .fab{position:fixed;right:18px;bottom:78px;z-index:31;width:58px;height:58px;border-radius:50%;border:none;
+    background:var(--accent);color:#062033;font-size:1.9rem;font-weight:800;box-shadow:0 6px 18px rgba(56,189,248,.35);cursor:pointer;}
+  .fab:active{transform:scale(.94);}
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;justify-content:center;z-index:50;}
+  .overlay.open{display:flex;}
+  .sheet{background:var(--card);border:1px solid var(--line);border-radius:16px 16px 0 0;width:100%;max-width:820px;padding:18px 16px 28px;max-height:88vh;overflow:auto;}
+  .sheet h3{margin-bottom:10px;}
+  .kinds{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
+  .kinds button{border:1px solid var(--line);background:var(--card2);color:var(--text);border-radius:999px;padding:8px 13px;font-size:.8rem;cursor:pointer;}
+  .kinds button.active{border-color:var(--accent);color:var(--accent);}
+  .sheet input,.sheet textarea,.sheet select{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--text);
+    border-radius:10px;padding:11px 12px;font-size:.95rem;margin:6px 0;font-family:inherit;}
+  .sheet .actions{display:flex;gap:8px;margin-top:12px;}
+  .sheet .actions button{flex:1;padding:13px;border-radius:10px;font-size:.95rem;font-weight:800;cursor:pointer;}
+  #go{background:var(--accent);color:#062033;border:none;}
+  #cancel{background:var(--card2);color:var(--text);border:1px solid var(--line);}
+  .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#111827;color:var(--text);
+    border:1px solid var(--line);padding:11px 18px;border-radius:12px;font-size:.85rem;display:none;z-index:60;
+    max-width:90vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .loading{color:var(--muted);text-align:center;padding:50px 20px;}
+  .switch{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(42,52,68,.5);font-size:.88rem;}
+  .switch:last-child{border-bottom:none;}
+  .switch input{width:44px;height:24px;appearance:none;background:var(--card2);border:1px solid var(--line);border-radius:999px;position:relative;cursor:pointer;transition:.2s;}
+  .switch input:checked{background:var(--accent);border-color:var(--accent);}
+  .switch input:before{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s;}
+  .switch input:checked:before{left:22px;}
+  .listrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(42,52,68,.5);}
+  .listrow:last-child{border-bottom:none;}
+  .listrow .grow{flex:1;min-width:0;}
+  .empty{color:var(--muted);font-size:.85rem;text-align:center;padding:24px 10px;}
+  .footer{color:var(--muted);font-size:.72rem;margin-top:16px;border-top:1px solid var(--line);padding-top:12px;}
+  .footer a{color:var(--accent);}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);}
+  .section{display:none;} .section.active{display:block;}
+  .checklist{background:var(--card2);border:1px solid var(--line);border-radius:10px;margin-top:8px;padding:10px 12px;}
+  .checklist ol{padding-left:18px;font-size:.83rem;color:var(--muted);}
+  .checklist li{margin:5px 0;}
+  .checklist summary{font-weight:700;font-size:.87rem;cursor:pointer;color:var(--text);}
+  .searchrow{display:flex;gap:8px;margin-bottom:10px;}
+  .searchrow input{flex:1;background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:11px 13px;font-size:.95rem;}
+  .searchrow input:focus{outline:2px solid var(--accent);}
+  .suggest{list-style:none;background:var(--card);border:1px solid var(--line);border-radius:10px;margin:4px 0 10px;max-height:230px;overflow:auto;}
+  .suggest li{padding:11px 14px;border-bottom:1px solid var(--line);cursor:pointer;font-size:.88rem;}
+  .suggest li:last-child{border-bottom:none;}
+  .suggest li small{color:var(--muted);display:block;}
+  .aqi{display:inline-flex;align-items:center;gap:5px;}
+  .hint{font-size:.74rem;color:var(--muted);margin-top:4px;}
+  .qbar{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none;}
+  .qbar::-webkit-scrollbar{display:none;}
+  .qchip{flex:0 0 auto;display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);
+    color:var(--text);border-radius:999px;padding:8px 12px;font-size:.8rem;cursor:pointer;font-weight:600;}
+  .qchip .qdot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 auto;}
+  .qdot.ok{background:var(--ok);} .qdot.amber{background:var(--warn);} .qdot.red{background:var(--severe);} .qdot.gray{background:#6b7280;}
+  .countdown{display:flex;align-items:center;gap:8px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.4);
+    border-radius:10px;padding:8px 10px;margin-top:8px;font-size:.83rem;}
+  .countdown .big{font-weight:800;color:var(--warn);}
+  .photo{max-width:100%;border-radius:8px;margin-top:6px;border:1px solid var(--line);}
+</style>
+</head>
+<body>
+<a class="sr" href="#main">Skip to content</a>
+<header>
+  <div class="head">
+    <div class="logo" style="display:flex;align-items:center;gap:8px"><img src="/static/icons/icon-192.png" alt="ServiceWaze" style="width:28px;height:28px;border-radius:8px;flex:0 0 auto">Service<span class="dot">Waze</span></div>
+    <span id="offlineDot" title="Offline — showing last data"></span>
+    <span class="pill" id="npill"><span class="dot gray" id="ndot"></span><span id="nlabel">…</span></span>
+    <div class="langs">
+      <button data-lang="en" class="active">EN</button><button data-lang="zu">ZU</button>
+      <button data-lang="xh">XH</button><button data-lang="st">ST</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- AREA CHIPS -->
+  <div class="areas" id="areasBar"></div>
+
+  <!-- SEARCH MODAL TRIGGER (hidden input used by add-area modal) -->
+  <div id="main">
+    <section id="sec-home" class="section active"></section>
+    <section id="sec-services" class="section"></section>
+    <section id="sec-transport" class="section"></section>
+    <section id="sec-news" class="section"></section>
+    <section id="sec-alerts" class="section"></section>
+    <section id="sec-more" class="section"></section>
+  </div>
+
+  <div class="footer">
+    <p data-i18n="foot1">ServiceWaze pulls live data from Eskom, Open-Meteo (weather & air quality), Google News SA, The Citizen, BusinessTech and Mastodon — merged into one feed. Community reports are user-verified. Always confirm critical information with official channels (links provided). No login needed; your areas and settings stay on your phone.</p>
+    <p style="margin-top:6px"><a href="/api/status?q=Soweto">JSON API</a> · <a href="/docs">API docs</a> · <a href="https://www.johannesburgwater.co.za">Joburg Water</a> · <a href="https://www.randwater.co.za">Rand Water</a> · <a href="https://www.weathersa.co.za">SAWS</a></p>
+  </div>
+</div>
+
+<!-- bottom nav -->
+<nav class="nav" id="nav" aria-label="Main navigation">
+  <button data-tab="home" class="active"><span class="ic">🏠</span><span data-i18n="tHome">Home</span></button>
+  <button data-tab="services"><span class="ic">🧰</span><span data-i18n="tSvc">Services</span></button>
+  <button data-tab="transport"><span class="ic">🚌</span><span data-i18n="tTr">Transport</span></button>
+  <button data-tab="news"><span class="ic">📰</span><span data-i18n="tNews">News</span></button>
+  <button data-tab="alerts"><span class="ic">🔔</span><span data-i18n="tAlerts">Alerts</span></button>
+  <button data-tab="more"><span class="ic">⚙️</span><span data-i18n="tMore">More</span></button>
+</nav>
+<button class="fab" id="fab" title="Report an issue" aria-label="Report an issue">＋</button>
+
+<!-- REPORT MODAL -->
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <h3 data-i18n="repT">Report something we missed</h3>
+    <input id="rArea" placeholder="Area / suburb" data-i18n="repArea">
+    <div class="kinds" id="kinds"></div>
+    <input id="rMsg" placeholder="What's happening? e.g. no water since 6am" data-i18n="repMsg">
+    <input id="rName" placeholder="Your name (optional)" data-i18n="repName">
+    <label class="hint" data-i18n="photoHint">📷 Add a photo (optional, under 300KB)</label>
+    <input type="file" id="rPhoto" accept="image/*" style="display:none">
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn sm" id="photoBtn" data-i18n="attach">Attach photo</button>
+      <button class="btn sm" id="voiceBtn">🎙️ <span data-i18n="voice">Add voice note</span></button>
+    </div>
+    <div class="hint" id="voiceHint" data-i18n="voiceHint">Record up to 15 seconds in your own language</div>
+    <div class="actions">
+      <button id="cancel" data-i18n="cancel">Cancel</button>
+      <button id="go" data-i18n="send">Send report</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD AREA MODAL -->
+<div class="overlay" id="addOverlay">
+  <div class="sheet">
+    <h3 data-i18n="addArea">Add a location to watch</h3>
+    <div class="searchrow">
+      <input id="addQ" placeholder="Search suburb / town…" data-i18n="ph">
+      <button class="btn" id="addGeo">📍</button>
+    </div>
+    <ul class="suggest" id="addSuggest"></ul>
+    <div class="actions">
+      <button id="addCancel" data-i18n="cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- auth modal -->
+<div class="overlay" id="authOverlay">
+  <div class="sheet">
+    <h3>🔐 ${t("loginT")}</h3>
+    <div class="hint" style="margin-bottom:8px">${t("authNote")}</div>
+    <input id="authU" placeholder="${t("loginU")}" autocomplete="username">
+    <input id="authP" type="password" placeholder="${t("loginP")}" autocomplete="current-password">
+    <div class="actions">
+      <button id="authCancel" style="background:var(--card2);color:var(--text);border:1px solid var(--line)">${t("cancel")}</button>
+      <button id="authLogin" style="background:var(--accent);color:#062033;border:none">${t("loginBtn")}</button>
+      <button id="authReg" style="background:var(--card2);color:var(--text);border:1px solid var(--line)">${t("regBtn")}</button>
+    </div>
+  </div>
+</div>
+
+<!-- first-run intro -->
+<div class="overlay" id="introOverlay">
+  <div class="sheet">
+    <h3 data-i18n="introT">Welcome to ServiceWaze 👋</h3>
+    <div class="hint" style="margin-bottom:12px;line-height:1.7">
+      <span data-i18n="intro1">1. Pick a location — your GPS or any suburb chip</span><br>
+      <span data-i18n="intro2">2. See live electricity, water, weather &amp; transport for it</span><br>
+      <span data-i18n="intro3">3. Report what the app missed — and get alerts on WhatsApp</span>
+    </div>
+    <button class="btn primary" id="introGo" style="width:100%">${t("gotIt")}</button>
+  </div>
+</div>
+
+<script>
+/* ================= BOOT / STATIC MODE ================= */
+const STATIC = {{ "true" if static_mode else "false" }};
+const BOOT = {{ boot|tojson if boot else "{}" }};
+
+/* ================= I18N ================= */
+const I18N={
+ en:{tHome:"Home",tSvc:"Services",tNews:"News",tAlerts:"Alerts",tMore:"More",noLs:"No load-shedding",
+  stage:"Stage",unknown:"Unknown",repT:"Report something we missed",repArea:"Area / suburb",
+  repMsg:"What's happening? e.g. no water since 6am",repName:"Your name (optional)",cancel:"Cancel",
+  send:"Send report",sent:"Report sent — thank you!",needArea:"Please enter the area name.",
+  err:"Something went wrong — try again.",addArea:"Add a location to watch",ph:"Search suburb / town…",
+  useLoc:"Finding your location…",upd:"Updated",attach:"Attach photo",photoHint:"📷 Add a photo (optional, under 300KB)",
+  confirm:"Confirm",liveOnly:"Available in live mode (run the app)",saved:"Saved!",removed:"Removed",
+  nothing:"Nothing here yet",refresh:"Refresh",areas:"My areas",addBtn:"Add location",
+  current:"Now",feels:"Feels",hum:"Humidity",wind:"Wind",gust:"Gust",air:"Air quality",good:"Good",
+  moderate:"Moderate",unhealthy:"Unhealthy",danger:"Danger",elec:"Electricity",water:"Water",
+  weather:"Weather",transport:"Transport",community:"Community reports",official:"Official channels",
+  context:"Context",notices:"Notices",links:"Links",report:"Report an issue",miss:"Missing something? Report it",
+  checklists:"Know what to do",emergency:"Emergency & safety",newsFeed:"News & updates",allNews:"All",
+  socialOnly:"Social",newsOnly:"News",areaAll:"All areas",cats:"Categories",srcStatus:"Data sources",
+  lastUpd:"Last updated",install:"Install app",installed:"App installed ✓",about:"About",clear:"Clear local data",
+  cleared:"Local data cleared",streak:"day streak",notifPerm:"Enable notifications",notifOn:"Notifications ON",
+  notifOff:"Notifications OFF",nEskom:"Alert me: load-shedding stage 2 or higher",nWx:"Alert me: severe weather advisories",
+  nRep:"Alert me: new community reports in my areas",nNews:"Alert me: news for my areas",waTitle:"WhatsApp alerts",
+  waDesc:"Get a ready-made summary you can send to your own WhatsApp (works without any account):",
+  waBtn:"Send to WhatsApp",waDigest:"Morning digest",hist:"Notification history",histEmpty:"No notifications yet",
+  noLogin:"No login needed — everything is stored on your phone.",demo:"Preview mode: full interactivity works when you run the app locally.",
+  restored:"Water restored",noWater:"No water",lowPress:"Low pressure",leak:"Leak / burst",powerOut:"Power out",route:"Route / transport",other:"Other",
+  noAdv:"No severe weather alerts for this area right now",schedule:"Load-shedding schedule",pushCard:"Push alerts (work even when the app is closed)",pushBtn:"Enable push alerts",pushOn:"Push ON — alerts reach you even when the app is closed",pushOff:"Push OFF",pushTest:"Send a test push",pushSent:"Test push sent ✓",pushErr:"Push not available on this device",waNum:"Your WhatsApp number (e.g. 27821234567)",waOptBtn:"Get alerts on WhatsApp",waTestBtn:"Send test message",waHint:"Real sending needs a provider token; without one, messages are recorded (dry-run).",waSaved:"WhatsApp alerts saved ✓",waSent:"Test message sent",allGood:"All good",needAtt:"Needs attention",issue:"issue",issues:"issues",nextLs:"Next load-shedding",startsIn:"starts in",headsUp:"heads-up! 55 min warning",min:"min",hrs:"hrs",schHint:"Per-area schedule needs a free ESP API token on the server",noSched:"No schedule — showing national status",tTr:"Transport",trNoLocal:"No government transport found right in",trAsk:"Want to see government transport for nearby areas?",trSvc:"Government transport in",trSite:"Official site",trLive:"Live status — news & community",trClear:"No disruptions reported",trAlert:"Disruption reported",trNoFeed:"No live feed",trLocal:"serves this area",trReport:"Report a transport issue",trCommunity:"Community route reports",trOfficial:"Timetables & live departures are on each operator's official app/site. Always verify before travelling.",trMyArea:"My area",trAllAreas:"All areas",areaFollow:"Alerts follow the selected area chip.",radar:"Rain radar",radarUpd:"Last frame",radarOpen:"Open live radar",noRadar:"Radar available in live mode",listen:"Read alerts aloud",sun:"Sunrise",sunset:"Sunset",dl:"Download area data (JSON)",gpsName:"Detected area",officialNotice:"Official notices",introT:"Welcome to ServiceWaze 👋",chat:"Community chat",chatQ:"Is it just me? Ask your neighbours",chatPlace:"Ask your neighbours — e.g. is the water out for everyone?",chatSend:"Send",chatEmpty:"No messages yet — start the conversation",chatReport:"🚩 Report",chatNote:"Messages are public to your area. Be kind. 3+ flags hide a message. No login needed.",chatOff:"Community chat works in live mode",intro1:"1. Pick a location — your GPS or any suburb chip",intro2:"2. See live electricity, water, weather & transport for it",intro3:"3. Report what the app missed — and get alerts on WhatsApp",gotIt:"Got it",qReport:"Report",qWa:"WhatsApp",qShare:"Share",loginT:"Log in to write in the chat",loginU:"Username",loginP:"Password",loginBtn:"Log in",regBtn:"Create account",loginToWrite:"Log in to join the chat",loggedAs:"Signed in as",logout:"Log out",authErr:"Wrong username or password",regErr:"Could not create account",authOK:"Welcome",authNote:"Read-only browsing is free — log in only to write in the community chat.",
+  voice:"🎙️ Add voice note",voiceHint:"Record up to 15 seconds in your own language",recStart:"⏺️ Recording… tap to stop",
+  recDone:"Voice note attached ✓",share:"Share",latest:"Latest in",banner:"Active alerts",
+  timeline:"Merged timeline",liveMode:"Full interactivity works when you run the app locally (reporting, confirms, voice notes, live refresh)."},
+ zu:{tHome:"Ikhaya",tSvc:"Izinsiza",tNews:"Izindaba",tAlerts:"Izaziso",tMore:"Okunye",noLs:"Akukho ukunqanyulwa",
+  stage:"Isigaba",unknown:"Akwaziwa",repT:"Bika into esiyishiyile",repArea:"Indawo",repMsg:"Kwenzakalani? Isb. akukho manzi",
+  repName:"Igama (ngokuzithandela)",cancel:"Yeka",send:"Thumela",sent:"Kuthunyelwe — ngiyabonga!",needArea:"Faka igama lendawo.",
+  err:"Kukhona okungahambanga — zama futhi.",addArea:"Engeza indawo",ph:"Sesha indawo…",useLoc:"Kutholwa indawo…",
+  upd:"Kubuyekezwe",attach:"Faka isithombe",photoHint:"📷 Isithombe (okukhethwayo)",confirm:"Qinisekisa",
+  liveOnly:"Kusebenza kuphela kumodi ebukhoma",saved:"Kugciniwe!",removed:"Kususiwe",nothing:"Akukho okwamanje",
+  refresh:"Vuselela",areas:"Izindawo zami",addBtn:"Engeza indawo",current:"Manje",feels:"Kuzwakala",hum:"Umswakama",
+  wind:"Umoya",gust:"Umlo",air:"Ikhwalithi yomoya",elec:"Ugesi",water:"Amanzi",weather:"Isimo sezulu",
+  transport:"Ezokuthutha",community:"Imibiko yomphakathi",official:"Imithombo esemthethweni",context:"Umongo",
+  notices:"Izaziso",links:"Izixhumanisi",report:"Bika inkinga",miss:"Kukhona okungakhonjisiwe? Bika",
+  checklists:"Ukwazi okumele ukwenze",emergency:"Usizo oluphuthumayo",newsFeed:"Izindaba",allNews:"Konke",
+  srcStatus:"Imithombo yedatha",lastUpd:"Kugcine ukubuyekezwa",install:"Faka uhlelo",installed:"Kufakiwe ✓",
+  about:"Mayelana",clear:"Sula idatha",cleared:"Idatha isuliwe",streak:"izinsuku zilandelana",
+  notifPerm:"Vula izaziso",notifOn:"Izaziso ZIVULIWE",notifOff:"Izaziso ZIVALIWE",
+  nEskom:"Ngazise: ukunqanyulwa isigaba 2 noma ngaphezulu",nWx:"Ngazise: isimo sezulu esibi",
+  nRep:"Ngazise: imibiko emisha endaweni yami",nNews:"Ngazise: izindaba zendawo yami",
+  waTitle:"Izaziso ze-WhatsApp",waDesc:"Thola isifinyezo osithumela ku-WhatsApp yakho:",
+  waBtn:"Thumela ku-WhatsApp",waDigest:"Isifinyezo sasekuseni",hist:"Umlando wezaziso",
+  histEmpty:"Azikho izaziso okwamanje",noLogin:"Akukho ukungena ngemfihlo — konke kugcinwa efonini yakho.",
+  restored:"Amanzi abuyile",noWater:"Akukho manzi",lowPress:"Ingcindezi ephansi",leak:"Ukuvuza",powerOut:"Ugesi unqanyuliwe",route:"Ezokuthutha",other:"Okunye",
+  noAdv:"Azikho izexwayiso zezulu ezinzima okwamanje",schedule:"Uhlelo lokunqanyulwa kukagesi",nextLs:"Ukunqanyulwa okulandelayo",startsIn:"kuqala",headsUp:"isaziso! imizuzu engu-55",min:"imiz",hrs:"amah",schHint:"Uhlelo lendawo ludinga ithokheni ye-ESP API",noSched:"Akukho uhlelo — isimo sikazwelonke",socialOnly:"Umphakathi",newsOnly:"Izindaba",areaAll:"Zonke izindawo",
+  voice:"🎙️ Engeza inothi lezwi",voiceHint:"Rekhoda imizuzwana engu-15 ngolimi lwakho",recStart:"⏺️ Kuyarekhowuda… thepha ukuyeka",
+  recDone:"Inothi lezwi linanyathiselwe ✓",share:"Yabelana",latest:"Okwakamuva e",banner:"Izaziso ezisebenzayo",
+  timeline:"Umugqa wesikhathi ohlanganisiwe",},
+ xh:{tHome:"Ikhaya",tSvc:"Iinkonzo",tNews:"Iindaba",tAlerts:"Izaziso",tMore:"Okunye",noLs:"Akukho kucinywa",
+  stage:"Inqanaba",unknown:"Ayaziwa",repT:"Xela into esiyishiyileyo",repArea:"Indawo",repMsg:"Kwenzeka ntoni?",
+  repName:"Igama (ngokuzithandela)",cancel:"Rhoxisa",send:"Thumela",sent:"Ithunyelwe — enkosi!",needArea:"Faka igama lendawo.",
+  err:"Kukho into engahambanga — zama kwakhona.",addArea:"Yongeza indawo",ph:"Khangela indawo…",useLoc:"Kufunyanwa indawo…",
+  upd:"Ihlaziywe",attach:"Faka ifoto",photoHint:"📷 Ifoto (okukhethwayo)",confirm:"Qinisekisa",
+  liveOnly:"Isebenza kuphela kwimodi ephilayo",saved:"Igonjiwe!",removed:"Isusiwe",nothing:"Akukho okwangoku",
+  refresh:"Hlaziya",areas:"Iindawo zam",addBtn:"Yongeza indawo",current:"Ngoku",feels:"Kuvakala",hum:"Ukufuma",
+  wind:"Umoya",gust:"Uqhwithela",air:"Umgangatho womoya",elec:"Umbane",water:"Amanzi",weather:"Imozulu",
+  transport:"Ezothutho",community:"Iingxelo zoluntu",official:"Amajelo asemthethweni",context:"Umxholo",
+  notices:"Izaziso",links:"Amakhonkco",report:"Xela ingxaki",miss:"Kukho into engekho? Xela",
+  checklists:"Yazi into omele uyenze",emergency:"Uncedo oluphuthumayo",newsFeed:"Iindaba",allNews:"Zonke",
+  srcStatus:"Imithombo yedatha",lastUpd:"Igqibele ukuhlaziywa",install:"Faka usetyenziso",installed:"Ifakiwe ✓",
+  about:"Malunga",clear:"Cima idatha",cleared:"Idatha icinyiwe",streak:"iintsuku ezilandelelanayo",
+  notifPerm:"Vula izaziso",notifOn:"Izaziso ZIVULIWE",notifOff:"Izaziso ZIVALIWE",
+  nEskom:"Ndazise: ukucinywa kwenqanaba 2 okanye ngaphezulu",nWx:"Ndazise: imozulu enobungozi",
+  nRep:"Ndazise: iingxelo ezintsha kwindawo yam",nNews:"Ndazise: iindaba zendawo yam",
+  waTitle:"Izaziso ze-WhatsApp",waDesc:"Fumana isishwankathelo osithumela kwi-WhatsApp yakho:",
+  waBtn:"Thumela kwi-WhatsApp",waDigest:"Isishwankathelo sasekuseni",hist:"Imbali yezaziso",
+  histEmpty:"Akukho zizaziso okwangoku",noLogin:"Akukho ukungena — konke kugcinwa kwifowuni yakho.",
+  restored:"Amanzi abuyile",noWater:"Akukho manzi",lowPress:"Uxinzelelo oluphantsi",leak:"Ukuvuza",powerOut:"Umbane ucinyiwe",route:"Ezothutho",other:"Okunye",
+  noAdv:"Akukho zilumkiso zemo zulu ezinzima okwangoku",schedule:"Ishedyuli yokucinywa kombane",nextLs:"Ukucinywa okulandelayo",startsIn:"iqala ngo",headsUp:"isilumkiso! imizuzu engama-55",min:"miz",hrs:"iih",schHint:"Ishedyuli yendawo ifuna ithokheni ye-ESP API",noSched:"Akukho shedyuli — isimo sikazwelonke",socialOnly:"Uluntu",newsOnly:"Iindaba",areaAll:"Zonke iindawo",},
+ st:{tHome:"Lapha",tSvc:"Litšebeletso",tNews:"Litia",tAlerts:"Litsebiso",tMore:"Tse ling",noLs:"Ha ho khaoloa",
+  stage:"Mokhahlelo",unknown:"Ha ho tsejoe",repT:"Tlaleha ntho eo re e hlolositseng",repArea:"Sebaka",
+  repMsg:"Ho etsahalang?",repName:"Lebitso (ka boithatelo)",cancel:"Hlakola",send:"Romela",sent:"E rometsoe — kea leboha!",
+  needArea:"Ka kopo kenya lebitso la sebaka.",err:"Ho na le phoso — leka hape.",addArea:"Kenya sebaka",ph:"Batla sebaka…",
+  useLoc:"Ho batloa sebaka…",upd:"E ntlafalitsoe",attach:"Kenya foto",photoHint:"📷 Foto (ka boithatelo)",
+  confirm:"Netefatsa",liveOnly:"E sebetsa feela ka mokhoa o phelang",saved:"E bolokiloe!",removed:"E tlositsoe",
+  nothing:"Ha ho letho hona joale",refresh:"Ntlafatsa",areas:"Libaka tsa ka",addBtn:"Kenya sebaka",
+  current:"Hona joale",feels:"Ho utloahala",hum:"Mongobo",wind:"Moea",gust:"Meea e matla",air:"Boleng ba moea",
+  elec:"Motlakase",water:"Metsi",weather:"Boemo ba leholimo",transport:"Lipalangoang",community:"Litlaleho tsa sechaba",
+  official:"Lits'ebeletso tsa semmuso",context:"Moelelo",notices:"Litsebiso",links:"Lihokelo",report:"Tlaleha bothata",
+  miss:"Ho na le ntho e sieo? Tlaleha",checklists:"Tseba seo u lokelang ho se etsa",emergency:"Thuso ea tšohanyetso",
+  newsFeed:"Litia",allNews:"Tsohle",srcStatus:"Mehloli ea data",lastUpd:"E qetelletse ho ntlafatsoa",
+  install:"Kenya sesebelisoa",installed:"E kenyelelitsoe ✓",about:"Ka",clear:"Hlakola data",
+  cleared:"Data e hlakotsoe",streak:"matsatsi a latellanang",notifPerm:"Bula litsebiso",
+  notifOn:"Litsebiso LI BULETSOE",notifOff:"Litsebiso LI KOALETSOE",
+  nEskom:"Ntsebise: khaolo ea mokhahlelo oa 2 kapa ho feta",nWx:"Ntsebise: boemo ba leholimo bo kotsi",
+  nRep:"Ntsebise: litlaleho tse ncha libakeng tsa ka",nNews:"Ntsebise: litia tsa sebaka sa ka",
+  waTitle:"Litsebiso tsa WhatsApp",waDesc:"Fumana kakaretso eo u ka e romellang ho WhatsApp ea hao:",
+  waBtn:"Romella ho WhatsApp",waDigest:"Kakaretso ea hoseng",hist:"Nalane ea litsebiso",
+  histEmpty:"Ha ho litsebiso hona joale",noLogin:"Ha ho hlokahale ho kena — tsohle li bolokiloe fonong ea hao.",
+  restored:"Metsi a khutlile",noWater:"Ha ho metsi",lowPress:"Khatello e tlase",leak:"Ho lutla",powerOut:"Motlakase o khaoloa",route:"Lipalangoang",other:"Ho hong",
+  noAdv:"Ha ho litemoso tsa boemo ba leholimo bo kotsi hajoale",schedule:"Lenchane ea khaolo ea motlakase",nextLs:"Khaolo e latelang",startsIn:"e qalang ka",headsUp:"temoso! metsotso e 55",min:"mets",hrs:"lih",schHint:"Lenchane ea sebaka e hloka token ea ESP API",noSched:"Ha ho lenchane — boemo ba naha",socialOnly:"Sechaba",newsOnly:"Litia",areaAll:"Libaka tsohle",}};
+let LANG=localStorage.getItem("sw_lang")||"en";
+const t=k=>(I18N[LANG]&&I18N[LANG][k])||I18N.en[k]||k;
+function applyI18n(){document.querySelectorAll("[data-i18n]").forEach(el=>{const k=el.getAttribute("data-i18n");if(t(k)!==k)el.textContent=t(k);});}
+
+/* ================= STATE ================= */
+const LS_AREAS="sw_areas", LS_SET="sw_settings", LS_HIST="sw_history", LS_SEEN="sw_seen", LS_STREAK="sw_streak";
+let areas=[]; let activeIdx=0; let statusCache={}; let feedItems=[]; let svcData={air:{},services:{},checklists:{}};
+const settings=Object.assign({nEskom:true,nWx:true,nRep:true,nNews:false}, JSON.parse(localStorage.getItem(LS_SET)||"{}"));
+function saveAreas(){localStorage.setItem(LS_AREAS,JSON.stringify(areas));}
+function saveSet(){localStorage.setItem(LS_SET,JSON.stringify(settings));}
+function hist(){return JSON.parse(localStorage.getItem(LS_HIST)||"[]");}
+function pushHist(x){let h=hist();h.unshift(x);h=h.slice(0,50);localStorage.setItem(LS_HIST,JSON.stringify(h));}
+function seenKey(a,k){return "sw:"+a+":"+k;}
+function esc(s){const d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML;}
+function toast(m){const el=document.getElementById("toast");el.textContent=m;el.style.display="block";clearTimeout(el._t);el._t=setTimeout(()=>el.style.display="none",3200);}
+function timeAgo(iso){if(!iso)return"";const d=new Date(iso);const s=(Date.now()-d.getTime())/1000;
+  if(s<60)return"now";if(s<3600)return Math.floor(s/60)+"m";if(s<86400)return Math.floor(s/3600)+"h";
+  return Math.floor(s/86400)+"d";}
+async function jget(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json();}
+function live(){if(!STATIC)return true;toast(t("liveOnly"));return false;}
+
+/* ================= AREAS ================= */
+function initAreas(){
+  try{areas=JSON.parse(localStorage.getItem(LS_AREAS)||"[]");}catch(e){areas=[];}
+  const firstRun=!areas.length;
+  if(!areas.length)areas=[{name:"Soweto",lat:-26.26781,lon:27.85849}];
+  if(!areas.find(a=>a.name==="Johannesburg"))areas.push({name:"Johannesburg",lat:-26.2041,lon:28.0473});
+  activeIdx=0;saveAreas();
+  if(firstRun&&navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(p=>{
+      const lat=+p.coords.latitude.toFixed(5),lon=+p.coords.longitude.toFixed(5);
+      areas[0]={name:"My location",lat,lon};activeIdx=0;saveAreas();renderAreasBar();renderHome();toast(t("useLoc"));
+      fetch("/api/reverse?lat="+lat+"&lon="+lon).then(r=>r.json()).then(d=>{
+        if(d.place&&d.place.name&&d.place.name!=="My location"){areas[0].name=d.place.name;saveAreas();renderAreasBar();renderHome();toast(t("gpsName")+": "+d.place.name);}
+      }).catch(()=>{});
+    },()=>{}, {timeout:6000});
+  }
+}
+function renderAreasBar(){
+  const bar=document.getElementById("areasBar");
+  bar.innerHTML=areas.map((a,i)=>`<button class="chip ${i===activeIdx?"active":""}" data-i="${i}">
+    <span>📍 ${esc(a.name)}</span><span class="x" data-del="${i}" title="Remove">✕</span></button>`).join("")
+    +`<button class="chip add" id="addChip">＋ ${t("addBtn")}</button>`;
+  bar.querySelectorAll(".chip[data-i]").forEach(b=>b.addEventListener("click",e=>{
+    if(e.target.dataset.del!==undefined){removeArea(+e.target.dataset.del);return;}
+    activeIdx=+b.dataset.i;renderAreasBar();renderHome();
+  }));
+  bar.querySelectorAll("[data-del]").forEach(x=>x.addEventListener("click",e=>{e.stopPropagation();removeArea(+x.dataset.del);}));
+  document.getElementById("addChip").onclick=openAddModal;
+}
+function removeArea(i){
+  if(areas.length<=1){toast(t("removed"));return;}
+  areas.splice(i,1);if(activeIdx>=areas.length)activeIdx=0;saveAreas();renderAreasBar();renderHome();
+  toast(t("removed"));
+}
+
+/* ================= ADD AREA MODAL ================= */
+let addTimer=null;
+function openAddModal(){
+  document.getElementById("addOverlay").classList.add("open");
+  document.getElementById("addQ").value="";document.getElementById("addSuggest").innerHTML="";
+  setTimeout(()=>document.getElementById("addQ").focus(),50);
+}
+function addArea(a){
+  if(areas.find(x=>x.name.toLowerCase()===a.name.toLowerCase())){toast(t("saved"));return;}
+  areas.push(a);activeIdx=areas.length-1;saveAreas();renderAreasBar();renderHome();toast(t("saved"));
+  if(document.getElementById("sec-transport").classList.contains("active"))renderTransport();
+  if(document.getElementById("sec-news").classList.contains("active"))renderNews();
+}
+document.getElementById("addQ").addEventListener("input",e=>{
+  clearTimeout(addTimer);const v=e.target.value.trim();const box=document.getElementById("addSuggest");
+  if(v.length<3){box.innerHTML="";return;}
+  addTimer=setTimeout(async()=>{
+    try{const{results}=await jget("/api/areas?q="+encodeURIComponent(v));
+      box.innerHTML=results.slice(0,6).map(r=>`<li data-lat="${r.lat}" data-lon="${r.lon}"><b>${esc(r.name)}</b><small>${esc(r.admin1||"")}${r.admin2?" · "+esc(r.admin2):""}</small></li>`).join("");
+      box.querySelectorAll("li").forEach(li=>li.onclick=()=>{
+        addArea({name:li.querySelector("b").textContent,lat:+li.dataset.lat,lon:+li.dataset.lon});
+        document.getElementById("addOverlay").classList.remove("open");
+      });
+    }catch(e){box.innerHTML="";}
+  },350);
+});
+document.getElementById("addGeo").onclick=()=>{
+  if(!navigator.geolocation){toast(t("err"));return;}toast(t("useLoc"));
+  navigator.geolocation.getCurrentPosition(p=>{
+    addArea({name:"My location",lat:+p.coords.latitude.toFixed(5),lon:+p.coords.longitude.toFixed(5)});
+    document.getElementById("addOverlay").classList.remove("open");
+  },()=>toast(t("err")),{timeout:8000});
+};
+document.getElementById("addCancel").onclick=()=>document.getElementById("addOverlay").classList.remove("open");
+
+/* ================= TABS ================= */
+document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");
+  const tab=b.dataset.tab;
+  document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+  document.getElementById("sec-"+tab).classList.add("active");
+  if(tab==="home")renderHome();
+  if(tab==="services")renderServices();
+  if(tab==="transport")renderTransport();
+  if(tab==="news")renderNews();
+  if(tab==="alerts")renderAlerts();
+  if(tab==="more")renderMore();
+  window.scrollTo(0,0);
+});
+
+/* ================= NATIONAL PILL ================= */
+function renderPill(stage){
+  const dot=document.getElementById("ndot"),lab=document.getElementById("nlabel");
+  if(stage===0){dot.className="dot green";lab.textContent=t("noLs");}
+  else if(stage==="unknown"||stage==null){dot.className="dot gray";lab.textContent=t("unknown");}
+  else{dot.className="dot amber";lab.textContent=t("stage")+" "+stage;}
+}
+
+/* ================= DATA LOAD ================= */
+async function fetchStatus(area){
+  const u="/api/status?q="+encodeURIComponent(area.name)+(area.lat!=null&&area.name==="My location"?`&lat=${area.lat}&lon=${area.lon}`:"");
+  const d=await jget(u);statusCache[area.name]=d;return d;
+}
+async function loadAll(){
+  try{
+    const areasNow=[...areas];
+    await Promise.all(areasNow.map(a=>fetchStatus(a).catch(()=>null)));
+    try{feedItems=(await jget("/api/feed?limit=80")).items||[];}catch(e){feedItems=[];}
+    try{svcData=await jget("/api/services");}catch(e){}
+    const d=statusCache[areas[activeIdx]?.name]||{};
+    renderPill(d.electricity?.status?.stage);
+    renderHome();renderNews();renderServices();
+    checkNotifications();
+    bumpStreak();
+    if(document.getElementById("sec-alerts").classList.contains("active"))renderAlerts();
+  }catch(e){toast(t("err"));}
+}
+function bumpStreak(){
+  try{const s=JSON.parse(localStorage.getItem(LS_STREAK)||'{"d":"","c":0}');
+    const today=new Date().toDateString();
+    if(s.d!==today){s.c=(new Date(Date.now()-864e5).toDateString()===s.d)?s.c+1:1;s.d=today;}
+    localStorage.setItem(LS_STREAK,JSON.stringify(s));
+  }catch(e){}
+}
+
+/* ================= HOME ================= */
+function kindLabel(k){const m={restored:t("restored")||"restored",no_water:t("noWater")||"No water",low_pressure:t("lowPress")||"Low pressure",leak:t("leak")||"Leak",power_out:t("powerOut")||"Power out",route:t("route")||"Route",other:t("other")||"Other"};return m[k]||k;}
+const KIND_LABELS={restored:"restored",no_water:"noWater",low_pressure:"lowPress",leak:"leak",power_out:"powerOut",route:"route",other:"other"};
+
+function renderHome(){
+  const el=document.getElementById("sec-home");
+  const area=areas[activeIdx];if(!area){el.innerHTML=`<div class="empty">${t("nothing")}</div>`;return;}
+  const d=statusCache[area.name]||{};
+  el.innerHTML=`<div class="loading">${t("refresh")}…</div>`;
+  const w=d.weather,air=d.air,elec=d.electricity,water=d.water,tr=d.transport;
+  /* hero */
+  const _advs=(w&&w.advisories)||[];
+  const nRed=(_advs.some(a=>a.level==="severe")?1:0);
+  const nAmber=((elec&&elec.status.stage>=2)?1:0)+(_advs.length?1:0);
+  const nIssues=nRed+nAmber;
+  const overall=nRed?"severe":nIssues?"warn":"ok";
+  let hero=`<div class="hero">
+    <div class="top">
+      <div><div class="big">${w&&w.current?w.current.temp+"°":""}</div>
+        <div class="desc">${esc(area.name)} · ${w&&w.current?esc(w.current.desc):""}</div></div>
+      <div style="width:100%"></div>
+      <div><span class="badge ${overall==="ok"?"ok":overall==="warn"?"warn":"severe"}">${overall==="ok"?"✅ "+t("allGood"):nIssues+" "+t(nIssues>1?"issues":"issue")}</span></div>
+      <div class="side">
+        ${air?`<div class="aqi"><span class="badge ${air.band==="good"?"ok":air.band==="moderate"?"warn":"severe"}">${t("air")}: ${air.aqi} ${esc(air.label)}</span></div>`:""}
+        ${elec?`<div style="margin-top:6px"><span class="badge ${elec.status.stage===0?"ok":elec.status.stage==="unknown"?"info":"warn"}">⚡ ${esc(elec.status.label)}</span></div>`:""}
+      </div>
+    </div>
+    <div class="mini">
+      ${w&&w.daily?w.daily.map(x=>`<div class="m">${x.icon}<br>${esc(x.date)}<br><b>${x.tmax}°/${x.tmin}°</b><br>☔${x.precip_prob}%</div>`).join(""):""}
+      ${w&&w.current?`<div class="m">${t("feels")}<br><b>${w.current.feels}°</b><br>${t("hum")} ${w.current.humidity}%</div>`:""}
+      ${w&&w.current?`<div class="m">${t("wind")}<br><b>${w.current.wind}</b><br>${t("gust")} ${w.current.gusts}</div>`:""}
+    ${w&&w.daily&&w.daily[0]&&w.daily[0].sunrise?`<div class="m">${t("sun")}<br><b>${w.daily[0].sunrise}</b><br>${t("sunset")} ${w.daily[0].sunset}</div>`:""}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn sm primary" onclick="openReport('other')">＋ ${t("qReport")}</button>
+      <button class="btn sm" onclick="waAlert('${esc(area.name)}')">💬 ${t("qWa")}</button>
+      <button class="btn sm" onclick="shareArea()">📤 ${t("qShare")}</button>
+      <button class="btn sm" onclick="readAloud()">🔊 ${t("listen")}</button>
+    </div>
+    ${w&&w.advisories&&w.advisories.length?`<div class="adv">${w.advisories.map(a=>`<div class="chipadv ${a.level}">${a.icon} ${esc(a.text)}</div>`).join("")}</div>`
+      :`<div class="adv"><div class="chipadv warn">✅ ${esc(t("noAdv"))}</div></div>`}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+      <div class="note" style="margin-top:0">${t("upd")}: ${esc((d.updated_at||"").replace("T"," ").slice(0,16))}</div>
+      <button class="btn sm" onclick="shareArea()">📤 ${t("share")}</button></div>
+  </div>`;
+  /* electricity card */
+  let elecCard=`<div class="card"><h2>⚡ ${t("elec")}</h2>
+    <div class="row"><span class="k">${t("elec")}</span><span class="badge ${elec&&elec.status.stage===0?"ok":elec&&elec.status.stage==="unknown"?"info":"warn"}">${esc(elec?elec.status.label:t("unknown"))}</span></div>
+    ${elec&&elec.esp?`<div class="note">${esc(elec.esp.source)}: ${esc(elec.esp.stage)}</div>`:""}
+    <div class="note">${esc(elec?elec.note:"")}</div>
+    <div id="nextWin"></div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm" onclick="openSchedule()">📅 ${t("schedule")}</button>
+      <button class="btn sm" onclick="openReport('power_out')">${t("report")}</button>
+      <button class="btn sm" onclick="openReport('other')">${t("miss")}</button></div>
+    <div id="schedBox"></div></div>`;
+  /* water card */
+  const reps=(water&&water.reports)||[];
+  const repHtml=reps.length?reps.map(r=>`<div class="report"><div class="meta">
+      <span class="repkind ${esc(r.kind)}">${esc(r.area)} · ${esc(kindLabel(r.kind))}</span>
+      <span>${timeAgo(r.created)} · ${r.confirms}✓</span></div>
+      ${r.message?`<div class="msg">${esc(r.message)}</div>`:""}
+      ${r.has_photo?(STATIC?`<div class="src">📷 ${t("attach")}</div>`:`<img class="photo" src="/api/photo/${r.id}" alt="report photo" loading="lazy">`):""}
+      ${r.has_audio?(STATIC?`<div class="src">🎙️ ${t("voice")}</div>`:`<audio controls preload="none" src="/api/audio/${r.id}" style="width:100%;margin-top:6px"></audio>`):""}
+      <div style="margin-top:6px"><button class="btn sm" onclick="confirmRep(${r.id})">${t("confirm")}</button></div></div>`).join("")
+    :`<div class="empty">${t("nothing")} — ${t("community")}</div>`;
+  const offLinks=((water&&water.official)||[]).map(o=>{
+    if(o.type==="call")return`<a href="tel:${esc(o.value.replace(/\s/g,""))}">📞 ${esc(o.name)} — ${esc(o.value)}<small>${esc(o.note||"")}</small></a>`;
+    if(o.type==="whatsapp")return`<a href="https://wa.me/${esc(o.value.replace(/\D/g,""))}">💬 ${esc(o.name)} — ${esc(o.value)}<small>${esc(o.note||"")}</small></a>`;
+    return`<a href="${esc(o.value)}" target="_blank" rel="noopener">🔗 ${esc(o.name)}<small>${esc(o.note||"")}</small></a>`;
+  }).join("");
+  let waterCard=`<div class="card"><h2>🚰 ${t("water")}</h2>
+    <div class="row"><span class="k">${t("community")}</span><span class="badge ${reps.length?"warn":"ok"}">${reps.length} ${t("upd")}</span></div>
+    ${repHtml}
+    ${(water&&water.official_notices&&water.official_notices.length)?`<div style="margin-top:10px"><b style="font-size:.85rem">🏛️ ${t("officialNotice")}</b>`+
+      water.official_notices.slice(0,4).map(n=>`<div class="report"><div class="meta"><span style="color:var(--ok)">🏛️ ${esc(n.source)}</span><span>${timeAgo(n.time)}</span></div>
+        <div class="msg">${n.url?`<a href="${esc(n.url)}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none">${esc(n.title)}</a>`:esc(n.title)}</div></div>`).join("")+`</div>`:""}
+    <div style="margin-top:10px"><b style="font-size:.85rem">${t("official")}</b><div class="links">${offLinks}</div></div>
+    <div class="note"><b>${t("context")}:</b> ${esc((water&&water.context)||"")}</div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm primary" onclick="openReport('no_water')">＋ ${t("report")}</button>
+      <button class="btn sm" onclick="openReport('other')">${t("miss")}</button></div></div>`;
+  /* weather card */
+  let wxCard=`<div class="card"><h2>🌦️ ${t("weather")}</h2>`;
+  if(w&&w.current){
+    wxCard+=`<div class="row"><span class="k">${t("current")}</span><span>${w.current.icon} <b>${w.current.temp}°C</b> — ${esc(w.current.desc)}</span></div>
+      <div class="row"><span class="k">${t("feels")} / ${t("hum")}</span><span>${w.current.feels}°C / ${w.current.humidity}%</span></div>
+      <div class="row"><span class="k">${t("wind")} / ${t("gust")}</span><span>${w.current.wind} / ${w.current.gusts} km/h</span></div>`;
+    if(w.daily)wxCard+=`<div class="row"><span class="k">3-day</span><span>${w.daily.map(x=>`${x.icon} ${esc(x.date)} ${x.tmax}°/${x.tmin}°`).join(" · ")}</span></div>`;
+  }else{wxCard+=`<div class="note">${t("err")}</div>`;}
+  if(air)wxCard+=`<div class="row"><span class="k">${t("air")}</span><span class="badge ${air.band==="good"?"ok":air.band==="moderate"?"warn":"severe"}">AQI ${air.aqi} — ${esc(air.label)}</span></div>
+    <div class="note">PM2.5: ${air.pm2_5??"—"} · PM10: ${air.pm10??"—"} · O₃: ${air.o3??"—"} · NO₂: ${air.no2??"—"} (${esc(air.source)})</div>`;
+  wxCard+=`<div style="margin-top:10px"><button class="btn sm" onclick="openReport('other')">${t("miss")}</button></div></div>`;
+  /* transport card */
+  const trN=((tr&&tr.notices)||[]).map(n=>`<div class="report"><div class="meta"><span>${esc(n.title)}</span></div><div class="msg">${esc(n.detail)}</div></div>`).join("");
+  const trL=((tr&&tr.links)||[]).map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener">🔗 ${esc(l.name)}<small>${esc(l.note||"")}</small></a>`).join("");
+  let trCard=`<div class="card"><h2>🚌 ${t("transport")}</h2>${trN||`<div class="empty">${t("nothing")}</div>`}
+    <div class="links">${trL}</div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm primary" onclick="goto('transport')">🚌 ${t("tTr")} →</button>
+      <button class="btn sm" onclick="openReport('route')">${t("report")}</button></div></div>`;
+  /* alert summary banner */
+  const advs=(w&&w.advisories)||[];
+  const sev=advs.filter(a=>a.level==="severe").length;
+  const activeReps=(water&&water.reports)||[];
+  const stageN=(elec&&elec.status&&typeof elec.status.stage==="number")?elec.status.stage:0;
+  let banner="";
+  if(sev||activeReps.length||stageN>=2){
+    const bits=[];
+    if(sev)bits.push("⚠️ "+sev+" weather");
+    if(activeReps.length)bits.push("🚰 "+activeReps.length+" report(s)");
+    if(stageN>=2)bits.push("⚡ "+t("stage")+" "+stageN);
+    banner=`<div class="card" style="border-color:rgba(248,113,113,.55);background:rgba(248,113,113,.08)">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-size:1.3rem">🔔</span>
+      <div style="flex:1"><b>${t("banner")}:</b> ${esc(bits.join(" · "))}</div>
+      <button class="btn sm" onclick="goto('alerts')">→</button></div></div>`;
+  }
+  /* merged timeline for this area (advisories + reports + relevant news/social) */
+  const tlines=[];
+  advs.forEach(a=>{
+    const m=(a.text.match(/\d{4}-\d{2}-\d{2}/)||[""])[0];
+    tlines.push({t:new Date((m||new Date().toISOString().slice(0,10))+"T12:00:00"),icon:a.icon,text:a.text,url:null});
+  });
+  activeReps.forEach(r=>{
+    tlines.push({t:new Date(r.created),icon:"🚰",text:`${r.area} — ${kindLabel(r.kind)}${r.message?": "+r.message:""}`,url:null});
+  });
+  const areaToks=area.name.toLowerCase().split(/[\s,]+/).filter(x=>x.length>=4);
+  (feedItems||[]).forEach(i=>{
+    const its=i.areas||[];
+    const relevant=its.includes("south africa")||its.some(x=>areaToks.some(tok=>x.includes(tok)))||areaToks.some(tok=>((i.title+" "+(i.body||"")).toLowerCase().includes(tok)));
+    if(relevant)tlines.push({t:new Date(i.time),icon:i.type==="social"?"🐦":"📰",text:i.title,url:i.url});
+  });
+  tlines.sort((a,b)=>b.t-a.t);
+  const tl=tlines.slice(0,8);
+  const tlHtml=tl.length?tl.map(x=>`<div class="report" style="display:flex;gap:8px;align-items:flex-start">
+      <span style="font-size:1rem">${x.icon}</span><div style="flex:1">
+      <div class="msg">${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none">${esc(x.text)}</a>`:esc(x.text)}</div>
+      <div class="src">${timeAgo(x.t.toISOString())}</div></div></div>`).join("")
+    :`<div class="empty">${t("nothing")}</div>`;
+  const timelineCard=`<div class="card"><h2>🕒 ${t("latest")} ${esc(area.name)}</h2>${tlHtml}</div>`;
+
+  el.innerHTML=banner+quickStatus()+hero+elecCard+waterCard+chatCard(area)+wxCard+radarCard(area)+trCard+timelineCard;
+  loadSchedule(area);
+}
+
+/* ================= SHARE / NAV HELPERS ================= */
+function shareIt(title,text,url){
+  if(navigator.share){navigator.share({title,text,url}).catch(()=>{});}
+  else{window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(text+"\n"+url),"_blank");}
+}
+function shareArea(){
+  const a=areas[activeIdx],d=statusCache[a.name]||{};
+  const lines=[`ServiceWaze — ${a.name}`];
+  if(d.electricity)lines.push("⚡ "+d.electricity.status.label);
+  if(d.weather&&d.weather.current)lines.push("🌦️ "+d.weather.current.temp+"°C "+d.weather.current.desc);
+  if(d.air)lines.push("🌫️ AQI "+d.air.aqi+" ("+d.air.label+")");
+  const reps=(d.water&&d.water.reports)||[];
+  if(reps.length)lines.push("🚰 "+reps.length+" community report(s)");
+  shareIt(t("share")+" "+a.name,lines.join("\n"),location.href);
+}
+function shareNews(i){
+  const it=window._newsItems&&window._newsItems[i];if(!it)return;
+  shareIt(it.title,it.title+" — "+it.source,it.url);
+}
+function goto(tab){
+  const b=document.querySelector(`#nav button[data-tab="${tab}"]`);if(b)b.click();
+}
+
+/* ================= QUICK STATUS BAR ================= */
+function quickStatus(){
+  const a=areas[activeIdx],d=statusCache[a.name]||{};
+  const es=d.electricity&&d.electricity.status;
+  const reps=(d.water&&d.water.reports)||[];
+  const adv=(d.weather&&d.weather.advisories)||[];
+  const trn=(d.transport&&d.transport.notices)||[];
+  const items=[
+    {k:"elec",label:t("elec"),color:es&&es.stage===0?"ok":es&&es.stage>0?"amber":"gray"},
+    {k:"water",label:t("water"),color:reps.length?"amber":"ok"},
+    {k:"weather",label:t("weather"),color:adv.some(x=>x.level==="severe")?"red":adv.length?"amber":"ok"},
+    {k:"transport",label:t("transport"),color:trn.length?"amber":"ok"},
+    {k:"news",label:t("newsFeed"),color:feedItems.length?"ok":"gray"}];
+  return `<div class="qbar">`+items.map(x=>`<button class="qchip" onclick="goto('${x.k==="news"?"news":"home"}')"><span class="qdot ${x.color}"></span>${x.label}</button>`).join("")+`</div>`;
+}
+
+function urlB64ToUint8(base64String){
+  const padding="=".repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base64);const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+
+/* ================= NEXT WINDOW + HEADS-UP (per-area schedule) ================= */
+let schedCache={};
+const headsFired=JSON.parse(localStorage.getItem("sw_heads")||"{}");
+function fireHeadsUp(area,win){
+  if(!("Notification" in window)||Notification.permission!=="granted"||!settings.nEskom)return;
+  const key=area.name+"|"+win.start;
+  if(headsFired[key])return;
+  const mins=(new Date(win.start)-Date.now())/60000;
+  if(mins<=55&&mins>35){
+    headsFired[key]=1;localStorage.setItem("sw_heads",JSON.stringify(headsFired));
+    new Notification("⚡ "+area.name,{body:t("stage")+" "+win.stage+" "+t("startsIn")+" ~55 "+t("min")});
+    pushHist({area:area.name,title:"⚡ "+area.name+" — "+t("stage")+" "+win.stage+" "+t("headsUp"),time:new Date().toISOString()});
+  }
+}
+async function loadSchedule(area){
+  const box=document.getElementById("nextWin");
+  const st=statusCache[area.name]&&statusCache[area.name].electricity;
+  if(STATIC||!st){if(box)box.innerHTML=`<div class="note">${t("noSched")}</div>`;return;}
+  try{
+    const stage=typeof st.status.stage==="number"?st.status.stage:0;
+    const u="/api/electricity/schedule?q="+encodeURIComponent(area.name)+(area.lat!=null?`&lat=${area.lat}&lon=${area.lon}`:"")+`&stage=${stage}`;
+    const d=await jget(u);
+    if(!d.schedule||!d.schedule.upcoming||!d.schedule.upcoming.length){
+      if(box)box.innerHTML=`<div class="note">${t("noSched")}</div>`;
+      return;
+    }
+    schedCache[area.name]=d.schedule.upcoming;
+    renderNextWin(area);
+    d.schedule.upcoming.slice(0,3).forEach(w=>fireHeadsUp(area,w));
+  }catch(e){if(box)box.innerHTML=`<div class="note">${t("noSched")}</div>`;}
+}
+function renderNextWin(area){
+  const box=document.getElementById("nextWin");
+  const wins=schedCache[area.name]||[];
+  const now=Date.now();
+  const next=wins.find(w=>new Date(w.end)>now);
+  if(!next||!box)return;
+  const start=new Date(next.start);
+  const mins=Math.round((start-now)/60000);
+  const when=mins>=120?Math.floor(mins/60)+" "+t("hrs")+" "+(mins%60)+" "+t("min"):mins+" "+t("min");
+  const day=start.toDateString()===new Date().toDateString()?t("today"):start.toDateString()===new Date(Date.now()+864e5).toDateString()?t("tomorrow"):start.toDateString().slice(0,10);
+  box.innerHTML=`<div class="countdown">⚡ <b>${t("nextLs")}:</b> ${esc(day)} ${start.toTimeString().slice(0,5)}–${new Date(next.end).toTimeString().slice(0,5)} · ${t("stage")} ${next.stage}<br><span class="big">${t("startsIn")} ${esc(when)}</span></div>`;
+}
+
+/* ================= LOAD-SHEDDING SCHEDULE (ESP API, optional) ================= */
+async function openSchedule(){
+  const box=document.getElementById("schedBox");
+  if(STATIC){box.innerHTML=`<div class="report"><div class="msg"><a href="https://loadshedding.eskom.co.za" target="_blank" rel="noopener">🔗 ${esc(t("schedule"))} — loadshedding.eskom.co.za</a></div></div>`;return;}
+  const a=areas[activeIdx];
+  box.innerHTML=`<div class="loading">${t("refresh")}…</div>`;
+  try{
+    const u="/api/electricity/schedule?q="+encodeURIComponent(a.name)+(a.lat!=null?`&lat=${a.lat}&lon=${a.lon}`:"");
+    const d=await jget(u);
+    if(d.schedule&&d.schedule.upcoming&&d.schedule.upcoming.length){
+      const fmt=iso=>{const dt=new Date(iso);return dt.toDateString()===new Date().toDateString()?t("today"):dt.toDateString()===new Date(Date.now()+864e5).toDateString()?t("tomorrow"):dt.toDateString().slice(0,10)+" "+dt.toTimeString().slice(0,5);};
+      box.innerHTML=`<div class="report"><div class="meta"><span>📅 ${esc(d.schedule.area)}</span><span>${esc(d.schedule.source)}</span></div>`+
+        d.schedule.upcoming.slice(0,10).map(ev=>`<div class="msg">${esc(fmt(ev.start))} → ${esc(fmt(ev.end))} · ${t("stage")} ${ev.stage}</div>`).join("")+`</div>`;
+    }else{
+      box.innerHTML=`<div class="report"><div class="msg">${esc(t("noLs"))} — <a href="${esc(d.official||"https://loadshedding.eskom.co.za")}" target="_blank" rel="noopener">${esc(t("schedule"))} ↗</a></div></div>`;
+    }
+  }catch(e){box.innerHTML=`<div class="report"><div class="msg">${t("err")}</div></div>`;}
+}
+
+/* ================= COMMUNITY CHAT (area-scoped) ================= */
+function chatCard(area){
+  const boxId="chatBox";
+  if(STATIC)return `<div class="card"><h2>💬 ${t("chat")}</h2><div class="note">${t("chatOff")}</div></div>`;
+  setTimeout(async()=>{
+    try{
+      const d=await jget("/api/chat?q="+encodeURIComponent(area.name)+(area.lat!=null?`&lat=${area.lat}&lon=${area.lon}`:""));
+      const box=document.getElementById(boxId);if(!box)return;
+      const msgs=d.messages||[];
+      box.innerHTML=(msgs.length?msgs.slice(0,15).map(m=>`<div class="report">
+          <div class="meta"><span>💬 ${esc(m.author)}</span><span>${timeAgo(m.created)} ${state.token?`<button class="btn sm" style="padding:2px 8px;font-size:.7rem" onclick="reportChat(${m.id})">${t("chatReport")}</button>`:""}</span></div>
+          <div class="msg">${esc(m.message)}</div></div>`).join("")
+        :`<div class="empty">${t("chatEmpty")}</div>`)
+        +`<div class="hint" style="margin-top:6px">${t("chatNote")}</div>`
+        +(state.token
+          ?`<div style="display:flex;gap:8px;margin-top:10px">
+            <input id="chatInput" placeholder="${t("chatPlace")}" style="flex:1;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 12px;font-size:.9rem">
+            <button class="btn primary" onclick="sendChat()">${t("chatSend")}</button></div>`
+          :`<div style="margin-top:10px"><button class="btn primary" style="width:100%" onclick="openAuth()">🔐 ${t("loginToWrite")}</button></div>`);
+    }catch(e){const box=document.getElementById(boxId);if(box)box.innerHTML=`<div class="note">${t("err")}</div>`;}
+  },250);
+  return `<div class="card"><h2>💬 ${t("chat")} — ${esc(area.name)}</h2><div id="${boxId}"><div class="loading">${t("refresh")}…</div></div></div>`;
+}
+async function sendChat(){
+  if(STATIC){toast(t("chatOff"));return;}
+  if(!state.token){openAuth();return;}
+  const a=areas[activeIdx];
+  const inp=document.getElementById("chatInput");if(!inp)return;
+  const msg=inp.value.trim();
+  if(msg.length<2){toast(t("err"));return;}
+  try{
+    const r=await fetch("/api/chat",{method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+state.token},
+      body:JSON.stringify({area:a.name,message:msg,lat:a.lat,lon:a.lon})});
+    if(r.status===401){logoutLocal();openAuth();return;}
+    inp.value="";renderHome();toast("✓");
+  }catch(e){toast(t("err"));}
+}
+async function reportChat(id){
+  if(STATIC)return;
+  if(!state.token){openAuth();return;}
+  try{const r=await fetch("/api/chat/report",{method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+state.token},body:JSON.stringify({id})});
+    if(r.status===401){logoutLocal();openAuth();return;}
+    renderHome();toast(t("chatReport")+" ✓");}
+  catch(e){toast(t("err"));}
+}
+
+/* ================= AUTH (login to WRITE in chat) ================= */
+const state={token:localStorage.getItem("sw_token")||"",username:localStorage.getItem("sw_user")||""};
+function openAuth(){document.getElementById("authOverlay").classList.add("open");
+  setTimeout(()=>document.getElementById("authU").focus(),50);}
+function closeAuth(){document.getElementById("authOverlay").classList.remove("open");}
+async function doAuth(mode){
+  const u=document.getElementById("authU").value.trim(),pw=document.getElementById("authP").value;
+  if(u.length<3||pw.length<6){toast(t("authErr"));return;}
+  try{
+    const r=await fetch("/api/auth/"+mode,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username:u,password:pw})});
+    const d=await r.json();
+    if(!r.ok){toast(t(mode==="login"?"authErr":"regErr"));return;}
+    state.token=d.token;state.username=d.username;
+    localStorage.setItem("sw_token",d.token);localStorage.setItem("sw_user",d.username);
+    closeAuth();toast(t("authOK")+" "+d.username+"!");renderHome();
+    if(document.getElementById("sec-more").classList.contains("active"))renderMore();
+  }catch(e){toast(t("err"));}
+}
+function logoutLocal(){
+  if(state.token)fetch("/api/auth/logout",{method:"POST",headers:{"Authorization":"Bearer "+state.token}}).catch(()=>{});
+  state.token="";state.username="";
+  localStorage.removeItem("sw_token");localStorage.removeItem("sw_user");
+  renderHome();
+  if(document.getElementById("sec-more").classList.contains("active"))renderMore();
+}
+document.getElementById("authLogin").onclick=()=>doAuth("login");
+document.getElementById("authReg").onclick=()=>doAuth("register");
+document.getElementById("authCancel").onclick=closeAuth;
+
+/* ================= RADAR + READ-ALOUD + EXPORT ================= */
+function radarCard(area){
+  if(STATIC)return `<div class="card"><h2>🌧️ ${t("radar")}</h2><div class="note">${t("noRadar")}</div></div>`;
+  const boxId="radarBox";
+  setTimeout(async()=>{
+    try{
+      const r=await jget("/api/radar?lat="+area.lat+"&lon="+area.lon);
+      const box=document.getElementById(boxId);if(!box)return;
+      box.innerHTML=`<img src="${esc(r.radar.tile)}" alt="${t("radar")}" style="width:100%;border-radius:10px;border:1px solid var(--line);background:#0b0f15">`+
+        `<div class="note">${t("radarUpd")}: ${esc(r.radar.label)} (UTC) · <a href="https://www.rainviewer.com/map.html?loc=${area.lat},${area.lon},7&o=83,34,0,0&c=3&s=1&sm=1&m=0" target="_blank" rel="noopener">${t("radarOpen")} ↗</a></div>`;
+    }catch(e){const box=document.getElementById(boxId);if(box)box.innerHTML=`<div class="note">${t("err")}</div>`;}
+  },200);
+  return `<div class="card"><h2>🌧️ ${t("radar")} — ${esc(area.name)}</h2><div id="${boxId}"><div class="loading">${t("refresh")}…</div></div></div>`;
+}
+function readAloud(){
+  if(!("speechSynthesis" in window)){toast(t("err"));return;}
+  const d=statusCache[areas[activeIdx].name]||{};
+  const lines=[areas[activeIdx].name];
+  if(d.electricity)lines.push(d.electricity.status.label);
+  if(d.weather&&d.weather.current)lines.push(d.weather.current.temp+" degrees, "+d.weather.current.desc);
+  if(d.weather&&d.weather.advisories&&d.weather.advisories.length)lines.push(d.weather.advisories.map(a=>a.text).join("."));
+  const reps=(d.water&&d.water.reports)||[];
+  if(reps.length)lines.push(reps.length+" community reports: "+reps.slice(0,3).map(r=>r.kind+" at "+r.area).join(", "));
+  const msg=new SpeechSynthesisUtterance(lines.join(". "));
+  msg.lang="en-ZA";window.speechSynthesis.cancel();window.speechSynthesis.speak(msg);
+}
+function downloadData(){
+  const a=areas[activeIdx],d=statusCache[a.name]||{};
+  const blob=new Blob([JSON.stringify({area:a,status:d,feed:feedItems.slice(0,20)},null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const x=document.createElement("a");x.href=url;x.download="servicewaze-"+a.name.replace(/\s+/g,"-")+".json";x.click();
+  URL.revokeObjectURL(url);toast(t("dl")+" ✓");
+}
+
+/* ================= REPORT MODAL ================= */
+let rKind="no_water";let rPhoto="";
+function openReport(kind){
+  if(!live())return;
+  rKind=kind||"no_water";rPhoto="";rAudio=null;
+  document.getElementById("voiceBtn").innerHTML="🎙️ <span>"+t("voice")+"</span>";
+  document.getElementById("voiceHint").textContent=t("voiceHint");
+  const area=areas[activeIdx];
+  document.getElementById("rArea").value=area?area.name.split(",")[0]:"";
+  document.getElementById("rMsg").value="";document.getElementById("rName").value="";
+  const box=document.getElementById("kinds");
+  box.innerHTML=Object.keys(KIND_LABELS).map(k=>`<button data-k="${k}" class="${k===rKind?"active":""}" onclick="setKind('${k}')">${t(KIND_LABELS[k])}</button>`).join("");
+  document.getElementById("overlay").classList.add("open");
+}
+function setKind(k){rKind=k;document.querySelectorAll("#kinds button").forEach(b=>b.classList.toggle("active",b.dataset.k===k));}
+document.getElementById("photoBtn").onclick=()=>document.getElementById("rPhoto").click();
+document.getElementById("rPhoto").addEventListener("change",e=>{
+  const f=e.target.files[0];if(!f)return;
+  if(f.size>300000){toast(t("err"));return;}
+  const rd=new FileReader();rd.onload=()=>{rPhoto=rd.result;toast(t("attach")+" ✓");};rd.readAsDataURL(f);
+});
+/* ---- voice note recorder (≤15s, works on mobile Chrome/Safari) ---- */
+let rAudio=null, rec=null, recStream=null, recChunks=[], recTimer=null, recOn=false, recSec=0;
+const voiceBtn=document.getElementById("voiceBtn"), voiceHint=document.getElementById("voiceHint");
+voiceBtn.onclick=()=>{
+  if(!live())return;
+  if(recOn){rec.stop();return;}
+  if(!navigator.mediaDevices||!window.MediaRecorder){toast(t("err"));return;}
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    recStream=stream;recChunks=[];recOn=true;recSec=0;
+    voiceBtn.textContent="⏹️ "+t("recStart").split("…")[0]+"…";voiceHint.textContent=recSec+"s";
+    rec=new MediaRecorder(stream);
+    rec.ondataavailable=e=>{if(e.data.size)recChunks.push(e.data);};
+    rec.onstop=()=>{
+      const blob=new Blob(recChunks,{type:rec.mimeType||"audio/webm"});
+      recStream.getTracks().forEach(t=>t.stop());
+      const rd=new FileReader();
+      rd.onload=()=>{rAudio={data:rd.result,mime:blob.type};voiceBtn.textContent="🎙️ "+t("recDone");voiceHint.textContent=blob.type+" ("+(blob.size/1024).toFixed(0)+"KB)";};
+      rd.readAsDataURL(blob);
+      recOn=false;clearInterval(recTimer);
+    };
+    rec.start();
+    recTimer=setInterval(()=>{recSec++;voiceHint.textContent=recSec+"s";
+      if(recSec>=15){if(rec.state!=="inactive")rec.stop();}},1000);
+  }).catch(()=>toast(t("err")));
+};
+async function sendReport(){
+  if(!live())return;
+  const area=document.getElementById("rArea").value.trim();
+  if(area.length<3){toast(t("needArea"));return;}
+  const a=areas[activeIdx];
+  const body={area,kind:rKind,message:document.getElementById("rMsg").value.trim(),
+    reporter:document.getElementById("rName").value.trim(),photo:rPhoto,audio:rAudio?rAudio.data:"",
+    lat:a&&a.lat!=null?a.lat:null,lon:a&&a.lon!=null?a.lon:null};
+  try{
+    await fetch("/api/report",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    document.getElementById("overlay").classList.remove("open");toast(t("sent"));
+    if(navigator.vibrate)navigator.vibrate(60);
+    const d=await fetchStatus(a);renderHome();checkNotifications();
+  }catch(e){toast(t("err"));}
+}
+async function confirmRep(id){
+  if(!live())return;
+  try{await fetch("/api/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+    const d=await fetchStatus(areas[activeIdx]);renderHome();toast("✓");
+    if(navigator.vibrate)navigator.vibrate(30);}
+  catch(e){toast(t("err"));}
+}
+document.getElementById("cancel").onclick=()=>document.getElementById("overlay").classList.remove("open");
+document.getElementById("go").onclick=sendReport;
+document.getElementById("fab").onclick=()=>openReport("other");
+
+/* ================= SERVICES ================= */
+function renderServices(){
+  const el=document.getElementById("sec-services");
+  const S=svcData.services||{};
+  let html=`<h2 style="margin-bottom:10px">🧰 ${t("tSvc")}</h2>`;
+  const order=["electricity","water","transport","weather","emergency"];
+  order.forEach(key=>{
+    const s=S[key];if(!s)return;
+    html+=`<div class="card"><h2>${s.icon} ${t(key==="emergency"?"emergency":key)}</h2><div class="links">`;
+    (s.items||[]).forEach(it=>{
+      if(it.type==="call")html+=`<a href="tel:${esc(it.value.replace(/\s/g,""))}">📞 ${esc(it.name)} — <b>${esc(it.value)}</b><small>${esc(it.note||"")}</small></a>`;
+      else if(it.type==="whatsapp")html+=`<a href="https://wa.me/${esc(it.value.replace(/\D/g,""))}">💬 ${esc(it.name)} — <b>${esc(it.value)}</b><small>${esc(it.note||"")}</small></a>`;
+      else html+=`<a href="${esc(it.value)}" target="_blank" rel="noopener">🔗 ${esc(it.name)}<small>${esc(it.note||"")}</small></a>`;
+    });
+    html+=`</div></div>`;
+  });
+  /* checklists */
+  html+=`<div class="card"><h2>📋 ${t("checklists")}</h2>`;
+  const C=svcData.checklists||{};
+  Object.values(C).forEach(cl=>{
+    html+=`<details class="checklist"><summary>${esc(cl.title)}</summary><ol>${cl.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol></details>`;
+  });
+  html+=`</div>`;
+  html+=`<div class="card"><h2>📡 ${t("srcStatus")}</h2>
+    <div class="row"><span class="k">Eskom (load-shedding)</span><span class="badge ok">${t("upd")}</span></div>
+    <div class="row"><span class="k">Open-Meteo (weather & air)</span><span class="badge ok">${t("upd")}</span></div>
+    <div class="row"><span class="k">Google News SA · Citizen · BusinessTech</span><span class="badge ok">${t("upd")}</span></div>
+    <div class="row"><span class="k">Mastodon (social)</span><span class="badge ${feedItems.some(i=>i.type==="social")?"ok":"warn"}">${feedItems.some(i=>i.type==="social")?"live":"degraded"}</span></div>
+    <div class="row"><span class="k">Community reports</span><span class="badge ok">${t("upd")}</span></div>
+    <div class="note">${t("upd")}: ${new Date().toISOString().replace("T"," ").slice(0,16)}</div></div>`;
+  el.innerHTML=html;
+}
+
+/* ================= TRANSPORT (govt transport per area) ================= */
+let tCache={};
+async function renderTransport(){
+  const el=document.getElementById("sec-transport");
+  const a=areas[activeIdx];
+  el.innerHTML=`<div class="loading">${t("refresh")}…</div>`;
+  try{
+    const u="/api/transport?q="+encodeURIComponent(a.name)+(a.lat!=null?`&lat=${a.lat}&lon=${a.lon}`:"");
+    const d=await jget(u);
+    tCache[a.name]=d;
+    el.innerHTML=transportHtml(d,a);
+  }catch(e){el.innerHTML=`<div class="card"><div class="note">${t("err")}</div></div>`;}
+}
+function transportHtml(d,a){
+  let html=`<h2 style="margin-bottom:6px">🚌 ${t("tTr")}</h2>
+    <div class="place" style="margin:0 0 10px;font-size:.95rem">📍 ${esc(d.area)} <span class="coords">· ${esc(d.province)}</span></div>`;
+  if(!d.has_local){
+    html+=`<div class="card" style="border-color:rgba(56,189,248,.5);background:rgba(56,189,248,.06)">
+      <h2>🚏 ${t("trNoLocal")} ${esc(a.name)}</h2>
+      <div class="hint" style="margin-bottom:8px">${t("trAsk")}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">`+
+      (d.nearby_areas||[]).map(n=>`<button class="chip" onclick="switchAreaByName('${esc(n)}')">📍 ${esc(n)}</button>`).join("")
+      +`</div></div>`;
+  }
+  html+=`<div class="card"><h2>🚆 ${t("trSvc")} ${esc(d.province)}</h2>`+
+    d.services.map(s=>`<div class="report">
+      <div class="meta"><span>${s.mode_icon} <b>${esc(s.name)}</b></span>
+        <span class="badge ${s.status==="alert"?"severe":s.status==="clear"?"ok":"neutral"}">${s.status==="alert"?t("trAlert")+" ("+s.alerts+")":s.status==="clear"?t("trClear"):t("trNoFeed")}</span></div>
+      <div class="msg">${esc(s.operator)}${s.has_local?" · 📍 "+t("trLocal"):""}</div>
+      <div class="note">${esc(s.note||"")}</div>
+      <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+        ${s.phone?`<a class="btn sm" href="tel:${esc(s.phone.replace(/\s/g,""))}">📞 ${esc(s.phone)}</a>`:""}
+        <a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">🔗 ${t("trSite")}</a></div>
+    </div>`).join("")+`</div>`;
+  if(d.status_items&&d.status_items.length){
+    html+=`<div class="card"><h2>📰 ${t("trLive")}</h2>`+
+      d.status_items.slice(0,4).map(i=>`<div class="report"><div class="meta"><span>${esc(i.source||"")}</span><span>${timeAgo(i.time)}</span></div>
+        <div class="msg">${i.url?`<a href="${esc(i.url)}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none">${esc(i.title)}</a>`:esc(i.title)}</div></div>`).join("")+`</div>`;
+  }
+  if(d.reports&&d.reports.length){
+    html+=`<div class="card"><h2>🚧 ${t("trCommunity")}</h2>`+
+      d.reports.slice(0,4).map(r=>`<div class="report"><div class="meta"><span>${esc(r.area)}</span><span>${timeAgo(r.created)} · ${r.confirms}✓</span></div>
+        <div class="msg">${esc(r.message||r.kind)}</div></div>`).join("")+`</div>`;
+  }
+  html+=`<div class="card"><button class="btn primary" style="width:100%" onclick="openReport('route')">🚧 ${t("trReport")}</button>
+    <div class="hint" style="margin-top:8px">${t("trOfficial")}</div></div>`;
+  return html;
+}
+function switchAreaByName(name){
+  const hit=areas.find(x=>x.name.toLowerCase()===name.toLowerCase());
+  if(hit){activeIdx=areas.indexOf(hit);renderAreasBar();renderHome();
+    if(document.getElementById("sec-transport").classList.contains("active"))renderTransport();
+    return;}
+  openAddModal();
+  const q=document.getElementById("addQ");if(q)q.value=name;
+}
+
+/* ================= NEWS ================= */
+let newsCat="all",newsType="all",newsArea="my",newsQ="";
+const CATS=["electricity","water","weather","transport","safety","economy","other"];
+function renderNews(){
+  const el=document.getElementById("sec-news");
+  let items=feedItems;
+  if(newsType==="news")items=items.filter(i=>i.type==="news");
+  if(newsType==="social")items=items.filter(i=>i.type==="social");
+  if(newsCat!=="all")items=items.filter(i=>i.category===newsCat);
+  if(newsArea==="my"){
+    const toks=[];
+    const _a=areas[activeIdx];
+    (_a.name.toLowerCase().split(/[\s,]+/)).forEach(x=>{if(x.length>=3)toks.push(x);});
+    items=items.filter(i=>{const its=i.areas||[];
+      return its.includes("south africa")||its.some(x=>toks.some(tk=>x.includes(tk)));});
+  }else if(newsArea!=="all"){
+    items=items.filter(i=>(i.areas||[]).includes(newsArea));
+  }
+  if(newsQ)items=items.filter(i=>(i.title+" "+i.body).toLowerCase().includes(newsQ));
+  const areaOpts=`<option value="my" ${newsArea==="my"?"selected":""}>${t("trMyArea")}</option>
+    <option value="all" ${newsArea==="all"?"selected":""}>${t("trAllAreas")}</option>`+
+    REGIONS.filter(r=>items.some(i=>i.areas.includes(r))).map(r=>`<option value="${r}" ${newsArea===r?"selected":""}>${r}</option>`).join("");
+  let html=`<h2 style="margin-bottom:8px">📰 ${t("newsFeed")}</h2>
+    <div class="filterbar">
+      <button class="fchip ${newsType==="all"?"active":""}" data-nt="all">${t("allNews")}</button>
+      <button class="fchip ${newsType==="news"?"active":""}" data-nt="news">${t("newsOnly")}</button>
+      <button class="fchip ${newsType==="social"?"active":""}" data-nt="social">${t("socialOnly")}</button>
+    </div>
+    <div class="filterbar">
+      <button class="fchip ${newsCat==="all"?"active":""}" data-nc="all">${t("allNews")}</button>
+      ${CATS.map(c=>`<button class="fchip ${newsCat===c?"active":""}" data-nc="${c}">${esc(c)}</button>`).join("")}
+    </div>
+    <div class="searchrow">
+      <input id="newsQ" placeholder="Filter news…" value="${esc(newsQ)}">
+      <select id="newsArea" style="background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:0 10px;font-size:.85rem">${areaOpts}</select>
+    </div>`;
+  if(!items.length)html+=`<div class="empty">${t("nothing")}</div>`;
+  window._newsItems=items;
+  items.slice(0,60).forEach((i,idx)=>{
+    html+=`<div class="news">
+      <div class="top"><span class="badge ${i.category==="electricity"?"warn":i.category==="water"?"severe":i.category==="weather"?"info":i.category==="safety"?"severe":i.category==="economy"?"ok":"neutral"}">${esc(i.category)}</span>
+        <span class="badge ${i.type==="social"?"info":"neutral"}">${i.type==="social"?"🐦 "+t("socialOnly"):"📰 "+t("newsOnly")}</span>
+        ${i.official?`<span class="badge ok" style="font-size:.68rem">🏛️</span>`:""}<span class="src">${esc(i.source)} · ${timeAgo(i.time)}</span>
+        <button class="btn sm" style="padding:3px 8px;margin-left:auto" onclick="shareNews(${idx})" title="${t("share")}">📤</button></div>
+      <h3><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a></h3>
+      ${i.body?`<p>${esc(i.body.slice(0,220))}</p>`:""}
+      <div class="top" style="margin-top:6px">${(i.areas||[]).map(a=>`<span class="areaTag">📍 ${esc(a)}</span>`).join("")}</div>
+    </div>`;
+  });
+  el.innerHTML=html;
+  el.querySelectorAll("[data-nt]").forEach(b=>b.onclick=()=>{newsType=b.dataset.nt;renderNews();});
+  el.querySelectorAll("[data-nc]").forEach(b=>b.onclick=()=>{newsCat=b.dataset.nc;renderNews();});
+  const q=document.getElementById("newsQ");q.oninput=()=>{newsQ=q.value.toLowerCase();renderNews();};
+  const sel=document.getElementById("newsArea");sel.onchange=()=>{newsArea=sel.value;renderNews();};
+}
+const REGIONS=["gauteng","western cape","kwa-zulu natal","eastern cape","free state","limpopo","mpumalanga","north west","northern cape","south africa"];
+
+/* ================= ALERTS ================= */
+function renderAlerts(){
+  const el=document.getElementById("sec-alerts");
+  const perm=("Notification" in window)&&Notification.permission;
+  const on=perm==="granted";
+  let html=`<h2 style="margin-bottom:10px">🔔 ${t("tAlerts")}</h2>`;
+  /* browser notifications */
+  html+=`<div class="card"><h2>🔔 ${t("notifPerm")}</h2>
+    <button class="btn primary" id="permBtn" style="width:100%">${on?t("notifOn"):t("notifOff")}</button>
+    <div class="switch"><span>${t("nEskom")}</span><input type="checkbox" id="sEskom" ${settings.nEskom?"checked":""}></div>
+    <div class="switch"><span>${t("nWx")}</span><input type="checkbox" id="sWx" ${settings.nWx?"checked":""}></div>
+    <div class="switch"><span>${t("nRep")}</span><input type="checkbox" id="sRep" ${settings.nRep?"checked":""}></div>
+    <div class="switch"><span>${t("nNews")}</span><input type="checkbox" id="sNews" ${settings.nNews?"checked":""}></div>
+    <div class="hint">${t("noLogin")} · ${t("areaFollow")}</div></div>`;
+  /* push (web push, works when closed) */
+  html+=`<div class="card"><h2>📲 ${t("pushCard")}</h2>
+    <button class="btn primary" id="pushBtn" style="width:100%">${t("pushBtn")}</button>
+    <div class="hint" id="pushState" style="margin-top:6px">${t("pushOff")}</div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" id="pushTestBtn" style="flex:1">${t("pushTest")}</button></div></div>`;
+  /* whatsapp */
+  html+=`<div class="card"><h2>💬 ${t("waTitle")}</h2><div class="hint" style="margin-bottom:8px">${t("waDesc")}</div>
+    <input id="waPhone" placeholder="${t("waNum")}" inputmode="tel" style="margin-top:6px">
+    <div style="display:flex;gap:8px;margin:8px 0">
+      <button class="btn sm primary" id="waOptBtn" style="flex:1">${t("waOptBtn")}</button>
+      <button class="btn sm" id="waTestBtn" style="flex:1">${t("waTestBtn")}</button></div>
+    <div class="hint">${t("waHint")}</div>`;
+  areas.forEach(a=>{
+    html+=`<div style="display:flex;gap:8px;margin:6px 0"><button class="btn sm grow" onclick="waAlert('${esc(a.name)}')">${t("waBtn")} — ${esc(a.name)}</button></div>`;
+  });
+  html+=`<button class="btn sm" onclick="waDigest()">🌅 ${t("waDigest")}</button></div>`;
+  /* history */
+  const h=hist();
+  html+=`<div class="card"><h2>🕘 ${t("hist")}</h2>`;
+  html+=h.length?h.slice(0,20).map(x=>`<div class="listrow"><div class="grow"><div style="font-size:.85rem">${esc(x.title)}</div><div class="src">${esc(x.area||"")} · ${timeAgo(x.time)}</div></div></div>`).join("")
+    :`<div class="empty">${t("histEmpty")}</div>`;
+  html+=`</div>`;
+  el.innerHTML=html;
+  const pb=document.getElementById("permBtn");
+  pb.onclick=async()=>{
+    if(!("Notification" in window)){toast(t("err"));return;}
+    const p=await Notification.requestPermission();
+    pb.textContent=p==="granted"?t("notifOn"):t("notifOff");pb.classList.toggle("primary",p==="granted");
+  };
+  const pushBtn=document.getElementById("pushBtn"),pushState=document.getElementById("pushState");
+  if(localStorage.getItem("sw_push_on")==="1"){pushState.textContent=t("pushOn");pushBtn.classList.remove("primary");}
+  pushBtn.onclick=async()=>{
+    if(!("Notification" in window)||!("serviceWorker" in navigator)){pushState.textContent=t("pushErr");return;}
+    if(Notification.permission!=="granted"){await Notification.requestPermission();}
+    if(Notification.permission!=="granted"){pushState.textContent=t("pushOff");return;}
+    try{
+      const key=(await (await fetch("/api/push/vapid")).json()).public_key;
+      const reg=await navigator.serviceWorker.ready;
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub){sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8(key)});}
+      await fetch("/api/push/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({endpoint:sub.endpoint,keys:sub.toJSON().keys,area:areas[activeIdx].name})});
+      localStorage.setItem("sw_push_on","1");
+      pushState.textContent=t("pushOn");pushBtn.classList.remove("primary");
+      toast(t("pushOn"));
+    }catch(e){pushState.textContent=t("pushErr");}
+  };
+  document.getElementById("pushTestBtn").onclick=async()=>{
+    try{const r=await fetch("/api/push/test",{method:"POST"});const d=await r.json();
+      toast(t("pushSent")+" ("+(d.sent||0)+")");}catch(e){toast(t("err"));}
+  };
+  document.getElementById("waOptBtn").onclick=async()=>{
+    const ph=document.getElementById("waPhone").value.trim();
+    if(ph.replace(/\D/g,"").length<9){toast(t("err"));return;}
+    try{await fetch("/api/whatsapp/optin",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({phone:ph,area:areas[activeIdx].name})});toast(t("waSaved"));}
+    catch(e){toast(t("err"));}
+  };
+  document.getElementById("waTestBtn").onclick=async()=>{
+    const ph=document.getElementById("waPhone").value.trim();
+    try{const r=await fetch("/api/whatsapp/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone:ph})});
+      const d=await r.json();toast(t("waSent")+" ("+(d.status||"")+")");}
+    catch(e){toast(t("err"));}
+  };
+  document.getElementById("sEskom").onchange=e=>{settings.nEskom=e.target.checked;saveSet();};
+  document.getElementById("sWx").onchange=e=>{settings.nWx=e.target.checked;saveSet();};
+  document.getElementById("sRep").onchange=e=>{settings.nRep=e.target.checked;saveSet();};
+  document.getElementById("sNews").onchange=e=>{settings.nNews=e.target.checked;saveSet();};
+}
+function waAlert(areaName){
+  const d=statusCache[areaName]||{};
+  const lines=[`ServiceWaze — ${areaName}`];
+  if(d.electricity)lines.push(`⚡ ${d.electricity.status.label}`);
+  if(d.weather&&d.weather.current)lines.push(`🌦️ ${d.weather.current.temp}°C ${d.weather.current.desc}`);
+  if(d.weather&&d.weather.advisories&&d.weather.advisories.length)lines.push("⚠️ "+d.weather.advisories[0].text);
+  if(d.air)lines.push(`🌫️ Air AQI ${d.air.aqi} (${d.air.label})`);
+  const reps=(d.water&&d.water.reports)||[];
+  if(reps.length)lines.push(`🚰 ${reps.length} community report(s): ${reps[0].kind}`);
+  lines.push("— ServiceWaze");
+  window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(lines.join("\n")),"_blank");
+}
+function waDigest(){
+  const lines=["📋 ServiceWaze morning digest — "+new Date().toDateString()];
+  areas.forEach(a=>{
+    const d=statusCache[a.name]||{};
+    let l=`📍 ${a.name}: `;
+    l+=(d.electricity?d.electricity.status.label:"")+", ";
+    l+=(d.weather&&d.weather.current?d.weather.current.temp+"°C "+d.weather.current.desc:"");
+    if(d.weather&&d.weather.advisories&&d.weather.advisories.length)l+=", ⚠️ "+d.weather.advisories[0].text;
+    lines.push(l);
+  });
+  window.open("https://api.whatsapp.com/send?text="+encodeURIComponent(lines.join("\n")),"_blank");
+}
+/* notifications engine */
+function checkNotifications(){
+  if(!("Notification" in window)||Notification.permission!=="granted")return;
+  areas.forEach(a=>{
+    const d=statusCache[a.name];if(!d)return;
+    if(settings.nEskom&&d.electricity&&d.electricity.status.stage>=2){
+      const k=seenKey(a.name,"eskom"+d.electricity.status.stage);
+      if(!localStorage.getItem(k)){localStorage.setItem(k,"1");
+        new Notification("⚡ "+a.name,{body:t("stage")+" "+d.electricity.status.stage+" — "+d.electricity.status.label});
+        pushHist({area:a.name,title:"⚡ "+a.name+" — "+d.electricity.status.label,time:new Date().toISOString()});}
+    }
+    if(settings.nWx&&d.weather&&d.weather.advisories){
+      d.weather.advisories.filter(x=>x.level==="severe").forEach(ad=>{
+        const k=seenKey(a.name,"wx"+ad.text.slice(0,30));
+        if(!localStorage.getItem(k)){localStorage.setItem(k,"1");
+          new Notification("⚠️ "+a.name,{body:ad.text});
+          pushHist({area:a.name,title:"⚠️ "+a.name+" — "+ad.text.slice(0,80),time:new Date().toISOString()});}
+      });
+    }
+    if(settings.nRep&&d.water&&d.water.reports){
+      d.water.reports.slice(0,3).forEach(r=>{
+        const k=seenKey(a.name,"rep"+r.id);
+        if(!localStorage.getItem(k)){localStorage.setItem(k,"1");
+          new Notification("🚰 "+a.name,{body:r.area+" — "+r.kind+(r.message?": "+r.message:"")});
+          pushHist({area:a.name,title:"🚰 "+a.name+" — "+r.kind,time:new Date().toISOString()});}
+      });
+    }
+  });
+  if(settings.nNews&&feedItems.length){
+    feedItems.slice(0,5).forEach(i=>{
+      const k=seenKey("news",i.id);
+      if(!localStorage.getItem(k)&&(i.areas||[]).some(x=>areas.some(a=>x===a.name.toLowerCase()||x==="south africa"))){
+        localStorage.setItem(k,"1");
+        new Notification("📰 "+i.category,{body:i.title});
+        pushHist({area:i.areas[0]||"SA",title:"📰 "+i.title.slice(0,80),time:new Date().toISOString()});
+      }
+    });
+  }
+}
+
+/* ================= MORE ================= */
+function renderMore(){
+  const el=document.getElementById("sec-more");
+  let s={};try{s=JSON.parse(localStorage.getItem(LS_STREAK)||'{"c":0}');}catch(e){}
+  let html=`<h2 style="margin-bottom:10px">⚙️ ${t("tMore")}</h2>
+    <div class="card"><h2>🔥 ${s.c||0} ${t("streak")}</h2>
+      <div class="hint">${t("noLogin")}</div></div>
+    <div class="card"><h2>🔐 ${t("loginT")}</h2>
+      ${state.token?`<div class="row"><span class="k">${t("loggedAs")}</span><span>${esc(state.username)}</span></div>
+      <button class="btn warn" style="width:100%;margin-top:8px" onclick="logoutLocal()">${t("logout")}</button>`
+      :`<div class="hint" style="margin-bottom:8px">${t("authNote")}</div>
+      <button class="btn primary" style="width:100%" onclick="openAuth()">🔐 ${t("loginToWrite")}</button>`}</div>
+    <div class="card"><h2>📍 ${t("areas")}</h2>`;
+  areas.forEach((a,i)=>{
+    html+=`<div class="listrow"><div class="grow">📍 ${esc(a.name)}<div class="src">${a.lat!=null?a.lat.toFixed(4)+", "+a.lon.toFixed(4):""}</div></div>
+      <button class="btn sm" onclick="removeArea(${i})">✕</button></div>`;
+  });
+  html+=`<button class="btn sm" style="width:100%;margin-top:8px" onclick="openAddModal()">＋ ${t("addBtn")}</button></div>
+    <div class="card"><h2>💬 ${t("waTitle")}</h2><button class="btn sm" style="width:100%" onclick="waDigest()">🌅 ${t("waDigest")}</button></div>
+    <div class="card"><h2>📲 ${t("install")}</h2><button class="btn primary" id="installBtn" style="width:100%">${t("install")}</button>
+      <div class="hint">${STATIC?"":"PWA — works offline after first load."}</div></div>
+    <div class="card"><h2>ℹ️ ${t("about")}</h2>
+      <div class="hint" style="margin-bottom:6px">ServiceWaze v2.0 · live data: Eskom, Open-Meteo, Google News SA, The Citizen, BusinessTech, Mastodon · community-verified reports · ${t("noLogin")}</div>
+      <div class="note">${STATIC?t("demo"):""}</div></div>
+    <div class="card"><h2>📤 ${t("dl")}</h2><button class="btn primary" style="width:100%" onclick="downloadData()">${t("dl")}</button></div>
+    <div class="card"><button class="btn warn" id="clearBtn" style="width:100%">${t("clear")}</button></div>`;
+  el.innerHTML=html;
+  const ib=document.getElementById("installBtn");
+  if(deferredPrompt){ib.onclick=async()=>{deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;ib.textContent=t("installed");};}
+  else{ib.onclick=()=>toast(STATIC?t("liveOnly"):t("installed"));ib.classList.add("primary");}
+  document.getElementById("clearBtn").onclick=()=>{
+    localStorage.clear();initAreas();renderAreasBar();location.reload();toast(t("cleared"));
+  };
+}
+let deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;});
+
+/* ================= INIT ================= */
+document.querySelectorAll(".langs button").forEach(b=>{
+  b.classList.toggle("active",b.dataset.lang===LANG);
+  b.onclick=()=>{LANG=b.dataset.lang;localStorage.setItem("sw_lang",LANG);
+    document.querySelectorAll(".langs button").forEach(x=>x.classList.remove("active"));b.classList.add("active");
+    applyI18n();renderAreasBar();renderHome();renderServices();renderNews();renderAlerts();renderMore();};
+});
+applyI18n();
+initAreas();renderAreasBar();
+/* first-run intro */
+if(!localStorage.getItem("sw_intro")){
+  const io=document.getElementById("introOverlay");io.classList.add("open");
+  document.getElementById("introGo").onclick=()=>{io.classList.remove("open");localStorage.setItem("sw_intro","1");};
+}
+if(STATIC&&BOOT&&BOOT.status){
+  statusCache[BOOT.status.place.name]=BOOT.status;
+  feedItems=BOOT.feed?BOOT.feed.items:[];
+  svcData=BOOT.services||{};
+  renderPill(BOOT.status.electricity?.status?.stage);
+  renderHome();renderServices();renderNews();
+
+}else{
+  renderHome();
+  loadAll();
+  setInterval(()=>{loadAll();},120000);
+  setInterval(()=>{areas.forEach(a=>{if(schedCache[a.name])renderNextWin(a);});},60000);
+  window.addEventListener("online",()=>{document.getElementById("offlineDot").style.display="none";loadAll();});
+  window.addEventListener("offline",()=>{document.getElementById("offlineDot").style.display="inline-block";});
+}
+if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js").catch(()=>{});}
+</script>
+</body>
+</html>
