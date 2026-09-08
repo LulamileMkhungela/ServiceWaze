@@ -2,12 +2,12 @@
    - offline-first app shell (install, then run on 3G, 2G or nothing)
    - network-first API with last-known-good cache fallback
    - push notifications for the Prepare Window (before impact, not after) */
-const VERSION = "sw-v3.0.0";
+const VERSION = "sw-v3.1.0";
 const SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/static/css/app.css?v=3.0.0",
-  "/static/js/app.js?v=3.0.0",
+  "/static/css/app.css?v=3.1.0",
+  "/static/js/app.js?v=3.1.0",
   "/static/icons/icon-180.png",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
@@ -63,6 +63,26 @@ self.addEventListener("fetch", (e) => {
       return cached || fetched;
     })
   );
+});
+
+/* ---------------- background flush ----------------
+   The page queues writes in localStorage when signal dies. When the browser
+   reports a connection again (or the OS fires a sync), we wake every open
+   ServiceWaze tab so the queue drains even if the app is not in front. */
+self.addEventListener("message", (e) => {
+  if (e.data === "flush-queue") {
+    e.waitUntil(self.clients.matchAll({ includeUncontrolled: true }).then((list) => {
+      list.forEach((c) => c.postMessage({ type: "flush-queue" }));
+    }));
+  }
+});
+
+self.addEventListener("sync", (e) => {
+  if (e.tag === "sw-queue") {
+    e.waitUntil(self.clients.matchAll({ includeUncontrolled: true }).then((list) => {
+      list.forEach((c) => c.postMessage({ type: "flush-queue" }));
+    }));
+  }
 });
 
 /* ---------------- push ---------------- */

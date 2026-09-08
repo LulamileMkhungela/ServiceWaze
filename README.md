@@ -35,7 +35,7 @@ The information exists. It is spread across a utility website, a WhatsApp line, 
 ## 2. What it does — the five loops
 
 ```
-  PREDICT  →  PREPARE  →  SHARE  →  SAVE  →  PROVE  →  LEARN
+  PREDICT  →  PREPARE  →  SHARE  →  SAVE  →  PROVE  →  LEARN  (+ CARE)
   "in 3h"     "do now"    "I have"   "R saved"  "receipt #"  "was it right?"
 ```
 
@@ -62,6 +62,12 @@ The only service app that shows you the **rand value** of a disruption and of a 
 * **solar payback** from local irradiance, **appliance cost per use**, **leak detection** from two meter readings
 * food basket cost vs the food poverty line, per city
 * a **savings ledger** where users log what they avoided spending
+
+### CARE — the watch circle (`watch.py`)
+Public safety is not only pipes and pylons. When the lights go at 19:00, the question that matters on a
+street is whether the gogo two doors down is alright. The watch circle lets a neighbour say "I'm safe",
+lets the street see who has gone quiet, and turns *concern* into a knock on a door — with pseudonyms
+only, never names, numbers or locations of people.
 
 ### PROVE — the accountability receipt (`receipts.py`)
 Every report becomes a tracked promise:
@@ -108,6 +114,7 @@ predict likely future behaviour from patterns in data?"*
 | **Offline report queue** (`static/js/app.js`) | everywhere | Reports, offers and chat are queued on the device when signal dies and flushed automatically on reconnect — the network fails exactly when you need to report. |
 | **Accessibility controls** | You → Make it easier to use | Text size A/A+/A++, high contrast, reduced motion, 44 px targets, focus rings, screen-reader labels — adjustable **inside** the app, not buried in OS settings. |
 | **Interactive onboarding** | first run | Three *do it now* steps (add your street → tick a prep task → offer something) that earn XP, instead of three slides nobody reads. |
+| **Watch circle** (`watch.py`) | Community | *"Is she okay?"* — the loop no status app closes. Name the neighbours you look out for (pseudonyms only), tap **I'm safe**, and the street sees who has been quiet for 48 h (amber) or 72 h (**please knock**). A neighbour's check-in is a claim, never a GPS ping. |
 
 ---
 
@@ -226,7 +233,7 @@ ServiceWaze/
 │   └── ARCHITECTURE.md           request flow, data tiering, design decisions
 ├── concepts/servicewaze-concept.md   original product thesis (2026)
 └── servicewaze/
-    ├── app.py                FastAPI app (82 endpoints) + PWA shell
+    ├── app.py                FastAPI app (87 endpoints) + PWA shell
     ├── net.py                tiered live-data layer + provenance + health registry
     ├── sim.py                deterministic demo data for offline operation
     ├── impact.py             ★ Prepare Window: threats, confidence, task plan

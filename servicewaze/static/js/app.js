@@ -762,6 +762,10 @@
         <div id="recBox"></div>
       </div>
       <div class="card tight">
+        <h2>👀 ${esc("Look out for each other")}</h2>
+        <div id="watchBox"><div class="skeleton"></div></div>
+      </div>
+      <div class="card tight">
         <h2>🔮 ${esc("24-hour forecast")} <span class="spacer"></span>
           <span class="badge">${esc("self-learning")}</span></h2>
         <div id="insightBox"><div class="skeleton"></div></div>
@@ -780,7 +784,7 @@
     $$("#feedSeg button").forEach(b => b.onclick = () => { S.feedFilter = b.dataset.f; renderCommunity(); });
     $("#authLink").onclick = (e) => { e.preventDefault(); openAuth(); };
     $("#chatSend").onclick = sendChat;
-    renderFeed(); renderReceipts(); renderChat(); renderSources(); renderInsights();
+    renderFeed(); renderReceipts(); renderChat(); renderSources(); renderInsights(); renderWatch();
   }
 
   function renderFeed() {
@@ -1187,6 +1191,12 @@
     window.addEventListener("online", () => {
       renderHeader(); flushQueue(); loadArea(true);
     });
+    // the service worker can wake us to drain the queue even when hidden
+    if (navigator.serviceWorker && typeof navigator.serviceWorker.addEventListener === "function") {
+      navigator.serviceWorker.addEventListener("message", (ev) => {
+        if (ev.data && ev.data.type === "flush-queue") flushQueue();
+      });
+    }
     window.addEventListener("offline", renderHeader);
 
     if (!S.areas.length) {
@@ -1706,6 +1716,72 @@
       S.settings.motion = S.settings.motion === "reduced" ? "full" : "reduced";
       saveSettings(); applyA11y(); renderYou();
     });
+  }
+
+
+  /* ============================================================ WATCH CIRCLE
+     "Is she okay?" — the loop no status app closes. You name the neighbours
+     you look out for (pseudonyms only), say you are safe, and the street can
+     see who has not been heard from so somebody knocks. */
+  async function renderWatch() {
+    const box = $("#watchBox"); if (!box) return;
+    const a = activeArea(); if (!a) return;
+    const area = a.name.split(",")[0];
+    box.innerHTML = `<div class="skeleton"></div>`;
+    try {
+      const j = await api(`/api/watch?area=${encodeURIComponent(area)}&device=${encodeURIComponent(S.device)}`);
+      const people = j.people || [];
+      box.innerHTML = `
+        <div class="grid2 mb8">
+          <button class="btn primary sm" id="imSafe">✅ ${esc("I'm safe")}</button>
+          <button class="btn sm ghost" id="addWatch">＋ ${esc("Watch someone")}</button>
+        </div>
+        ${people.length ? people.map((p) => `<div class="item">
+          <div class="between"><span class="t">${p.icon} ${esc(p.handle)}</span>
+            <span class="tiny">${p.hours_since != null ? Math.round(p.hours_since) + "h ago" : esc("no check-in yet")}</span></div>
+          <div class="b">${esc(p.state_label)}${p.note ? " · " + esc(p.note) : ""}</div>
+          <div class="grid2 mt8">
+            <button class="btn sm ghost" data-check="${p.id}">👋 ${esc("I checked on them")}</button>
+            <button class="btn sm ${p.state === "needs_help" ? "primary" : "ghost"}" data-help="${p.id}">🆘 ${esc("Needs help")}</button>
+          </div></div>`).join("")
+        : `<div class="empty" style="padding:12px"><span class="e">👀</span>${esc("Nobody is watching anyone here yet. Add one neighbour you check on.")}</div>`}
+        <div class="tiny mt8">${esc(j.privacy || "")} ${esc("After " + (j.ttl_hours || 48) + "h quiet, they turn amber; after " + (j.urgent_hours || 72) + "h, the street is asked to knock.")}</div>`;
+      $("#imSafe").onclick = async () => {
+        const r = await post("/api/watch/im-safe", { device: S.device, area });
+        toast("Marked safe — " + r.handle + " ✅");
+        renderWatch();
+      };
+      $("#addWatch").onclick = () => {
+        const sheet = $("#sheet");
+        sheet.innerHTML = `<div class="grab"></div><h3>👀 ${esc("Who do you look out for?")}</h3>
+          <p class="muted" style="margin:0 0 8px">${esc("Pseudonym only — never a real name, number or address.")}</p>
+          <label class="fl">Neighbour</label><input id="wtHandle" placeholder="e.g. Gogo at no. 42" maxlength="40">
+          <label class="fl">Note for the street</label><input id="wtNote" placeholder="e.g. uses a walking frame" maxlength="120">
+          <div class="grid2 mt12"><button class="btn ghost" id="wtCancel">${esc(t("cancel", "Cancel"))}</button>
+          <button class="btn primary" id="wtSend">${esc(t("add", "Add"))}</button></div>`;
+        $("#overlay").classList.add("on");
+        $("#wtCancel").onclick = closeSheet;
+        $("#wtSend").onclick = async () => {
+          const h = $("#wtHandle").value.trim();
+          if (h.length < 2) return toast("Name them somehow");
+          const r = await post("/api/watch/add", { device: S.device, handle: h, area, note: $("#wtNote").value.trim() });
+          toast(r.ok ? "Watching " + h + " 👀" : ("Could not add: " + r.error));
+          closeSheet(); renderWatch();
+        };
+      };
+      $$("[data-check]").forEach((b) => b.onclick = async () => {
+        const r = await post("/api/watch/checkin", { device: S.device, id: +b.dataset.check });
+        toast(r.ok ? "Checked on " + r.handle + " — +Ubuntu 🌍" : "Could not record that");
+        renderWatch();
+      });
+      $$("[data-help]").forEach((b) => b.onclick = async () => {
+        const r = await post("/api/watch/flag", { device: S.device, id: +b.dataset.help, state: "needs_help" });
+        toast(r.ok ? "Flagged — the street will knock 🆘" : "Could not flag");
+        renderWatch();
+      });
+    } catch (e) {
+      box.innerHTML = `<div class="muted">Watch circle unavailable.</div>`;
+    }
   }
 
   document.addEventListener("DOMContentLoaded", boot);

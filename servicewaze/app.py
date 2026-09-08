@@ -40,6 +40,7 @@ import grid as grid_mod
 import i18n
 import impact
 import insights
+import watch as watch_mod
 import net
 import push
 import receipts
@@ -638,6 +639,65 @@ def stokvel_contribute(sid: int, body: ContribIn, request: Request):
 def stokvel_detail(sid: int):
     return grid_mod.stokvel_detail(sid)
 
+
+
+
+# ---------------------------------------------------------------------------
+# Watch circle — "is she okay?" (public safety, the human loop)
+# ---------------------------------------------------------------------------
+@app.get("/api/watch")
+def watch_api(area: str = "", device: str = ""):
+    return watch_mod.circle(area.strip() or "Soweto", device.strip())
+
+
+class WatchIn(BaseModel):
+    device: str = ""
+    handle: str = ""
+    area: str = ""
+    note: str = ""
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+
+
+@app.post("/api/watch/add")
+def watch_add(body: WatchIn, request: Request):
+    _throttle(request, "watch", 20)
+    return watch_mod.add(_device(request, body.device), body.handle,
+                         body.area.strip(), body.note.strip(), body.lat, body.lon)
+
+
+class WatchCheckIn(BaseModel):
+    device: str = ""
+    id: int = 0
+    note: str = ""
+
+
+@app.post("/api/watch/checkin")
+def watch_checkin(body: WatchCheckIn, request: Request):
+    return watch_mod.checkin(_device(request, body.device), body.id, body.note.strip())
+
+
+class ImSafeIn(BaseModel):
+    device: str = ""
+    area: str = ""
+    note: str = ""
+
+
+@app.post("/api/watch/im-safe")
+def watch_im_safe(body: ImSafeIn, request: Request):
+    return watch_mod.im_safe(_device(request, body.device), body.area.strip(), body.note.strip())
+
+
+class WatchFlag(BaseModel):
+    device: str = ""
+    id: int = 0
+    state: str = "needs_help"
+    note: str = ""
+
+
+@app.post("/api/watch/flag")
+def watch_flag(body: WatchFlag, request: Request):
+    return watch_mod.flag(_device(request, body.device), body.id, body.state, body.note.strip())
 
 
 

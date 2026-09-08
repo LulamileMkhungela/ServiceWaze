@@ -93,6 +93,13 @@ BUSINESSES = [
     ("Umlazi Transport Co-op", "transport", "Durban", "073 559 0028", "Bakkie delivery — water, gas, parcels across Umlazi."),
 ]
 
+WATCH = [
+    ("Soweto", "demo-thabo", "Gogo at no. 42", "Uses a walking frame — check the back door.", 6),
+    ("Soweto", "demo-nomsa", "Neighbour Brave uKhozi", "Three small children.", 2),
+    ("Soweto", "demo-marie", "Uncle Sipho by the shop", "Diabetic — needs his fridge running.", 80),
+    ("Alexandra", "demo-lerato", "Mama on 3rd", "Night-shift nurse, sleeps days.", 80),
+]
+
 OPEN_BOARD = [
     ("Mama Nomsa Spaza", "Soweto", "open", "Generator on until 21:00 — cold drinks, bread, airtime."),
     ("Lerato Solar & Backup", "Alexandra", "open", "Phones and power banks charging, R5 a charge."),
@@ -118,6 +125,14 @@ STOKVELS = [
 
 
 def reset():
+    # make sure every module's tables exist before we try to clean them
+    for mod in ("grid", "watch"):
+        try:
+            m = __import__(mod)
+            if hasattr(m, "_db"):
+                m._db().close()
+        except Exception:
+            pass
     con = sqlite3.connect(DB)
     for tbl, col in [("offers", "device"), ("claims", "device"), ("stokvels", "device"),
                      ("stokvel_members", "handle"), ("reports", "reporter"),
@@ -125,7 +140,7 @@ def reset():
                      ("neighbours", "device"), ("profile", "device"),
                      ("businesses", "device"), ("open_board", "device"),
                      ("business_verifiers", "device"), ("outcomes", "area"),
-                     ("predictions", "area")]:
+                     ("predictions", "area"), ("checkins", "device")]:
         try:
             con.execute(f"DELETE FROM {tbl} WHERE {col} LIKE 'demo-%'")
         except Exception as e:
@@ -224,6 +239,19 @@ def seed():
         grid_mod.post_open(name, area, status, note,
                            "demo-" + ["thabo", "nomsa", "lerato"][OPEN_BOARD.index((name, area, status, note)) % 3])
 
+    # the watch circle: one ok, one quiet, one that needs a knock
+    try:
+        import watch
+        for area, dev, handle, note, hours_ago in WATCH:
+            watch.add(dev, handle, area, note)
+            con = sqlite3.connect(watch.DB)
+            con.execute("UPDATE watch SET last_check=? WHERE watcher=? AND handle=? AND area=?",
+                        ((now - timedelta(hours=hours_ago)).isoformat(timespec="seconds"),
+                         dev, handle, area))
+            con.commit(); con.close()
+    except Exception as e:
+        print("skip watch", e)
+
     # a little history so the forecast has something to learn from
     try:
         import insights
@@ -238,6 +266,7 @@ def seed():
     print("  stokvels   :", len(STOKVELS))
     print("  receipts   :", len(REPORTS))
     print("  businesses :", len(BUSINESSES), "/", len(OPEN_BOARD), "open-board posts")
+    print("  watch      :", len(WATCH), "neighbours")
     print("Run: uvicorn app:app --port 8000")
 
 

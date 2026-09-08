@@ -2,6 +2,7 @@
 import os
 import sys
 import pytest
+import time
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -20,6 +21,7 @@ import sources                       # noqa: E402
 import tariffs                       # noqa: E402
 import transport                     # noqa: E402
 import ussd                          # noqa: E402
+import watch                         # noqa: E402
 import whatsapp                      # noqa: E402
 
 DEVICE = "pytest-device"
@@ -34,7 +36,7 @@ def client():
 # ----------------------------------------------------------------- modules
 def test_module_imports():
     for m in (app_module, auth, feeds, grid_mod, i18n, impact, insights, push,
-              receipts, resilience, sources, tariffs, transport, ussd, whatsapp):
+              receipts, resilience, sources, tariffs, transport, ussd, watch, whatsapp):
         assert m is not None
 
 
@@ -379,3 +381,40 @@ def test_schedule_endpoint(client):
     sch = j["schedule"]
     if sch is not None:
         assert "estimated" in sch or "windows" in sch
+
+
+# --------------------------------------------------------------- watch circle
+def test_watch_circle_states():
+    watch.add("pytest-w1", "Gogo at no. 7", "Pytestville", "walking frame")
+    before = watch.circle("Pytestville", "pytest-w1")
+    assert any(p["handle"] == "Gogo at no. 7" for p in before["people"])
+    row = [p for p in before["people"] if p["handle"] == "Gogo at no. 7"][0]
+    assert row["state"] in ("unknown", "quiet", "knock", "ok")
+    watch.checkin("pytest-w2", row["id"])
+    after = watch.circle("Pytestville", "pytest-w1")
+    row2 = [p for p in after["people"] if p["handle"] == "Gogo at no. 7"][0]
+    assert row2["state"] == "ok" and row2["hours_since"] < 1
+
+
+def test_watch_im_safe_and_flag():
+    assert watch.im_safe("pytest-w1", "Pytestville")["ok"] is True
+    watch.add("pytest-w3", "Uncle at no. 9", "Pytestville")
+    row = [p for p in watch.circle("Pytestville")["people"] if p["handle"] == "Uncle at no. 9"][0]
+    watch.flag("pytest-w3", row["id"], "needs_help", "no water for medication")
+    flagged = [p for p in watch.circle("Pytestville")["people"] if p["handle"] == "Uncle at no. 9"][0]
+    assert flagged["state"] == "needs_help"
+
+
+def test_watch_endpoints(client):
+    area = "Pytestville-%d" % int(time.time())          # unique per run
+    r = client.post("/api/watch/add", json={"device": DEVICE, "handle": "Test Neighbour",
+                                            "area": area, "note": "test"}).json()
+    assert r["ok"] is True
+    c = client.get(f"/api/watch?area={area}&device={DEVICE}").json()
+    assert c["area"] == area and "privacy" in c
+    row = [p for p in c["people"] if p["handle"] == "Test Neighbour"][0]
+    assert client.post("/api/watch/checkin", json={"device": DEVICE, "id": row["id"]}).json()["ok"] is True
+    assert client.post("/api/watch/im-safe", json={"device": DEVICE, "area": area}).json()["ok"] is True
+    dup = client.post("/api/watch/add", json={"device": DEVICE, "handle": "Test Neighbour",
+                                              "area": area}).json()
+    assert dup["ok"] is False          # you cannot watch the same person twice
