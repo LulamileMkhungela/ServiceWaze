@@ -1,20 +1,27 @@
-"""Automated tests for ServiceWaze backend and PWA endpoints."""
+"""Automated tests for ServiceWaze v3 — backend, PWA shell and the money engine."""
 import os
 import sys
 import pytest
 from fastapi.testclient import TestClient
 
-# Ensure servicewaze directory is on sys.path when running pytest from repository root
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import app as app_module
-import auth
-import feeds
-import push
-import sources
-import transport
-import ussd
-import whatsapp
+import app as app_module            # noqa: E402
+import auth                          # noqa: E402
+import feeds                         # noqa: E402
+import grid as grid_mod              # noqa: E402
+import i18n                          # noqa: E402
+import impact                        # noqa: E402
+import push                          # noqa: E402
+import receipts                      # noqa: E402
+import resilience                    # noqa: E402
+import sources                       # noqa: E402
+import tariffs                       # noqa: E402
+import transport                     # noqa: E402
+import ussd                          # noqa: E402
+import whatsapp                      # noqa: E402
+
+DEVICE = "pytest-device"
 
 
 @pytest.fixture
@@ -23,59 +30,266 @@ def client():
         yield c
 
 
+# ----------------------------------------------------------------- modules
 def test_module_imports():
-    """Verify all core application modules import cleanly."""
-    assert app_module is not None
-    assert auth is not None
-    assert feeds is not None
-    assert push is not None
-    assert sources is not None
-    assert transport is not None
-    assert ussd is not None
-    assert whatsapp is not None
+    for m in (app_module, auth, feeds, grid_mod, i18n, impact, push, receipts,
+              resilience, sources, tariffs, transport, ussd, whatsapp):
+        assert m is not None
 
 
+# -------------------------------------------------------------------- PWA
 def test_root_pwa_html(client):
-    """Verify root endpoint returns the PWA dashboard HTML."""
-    response = client.get("/")
-    assert response.status_code == 200
-    assert "ServiceWaze" in response.text
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "ServiceWaze" in r.text
+    assert "/static/js/app.js" in r.text
+    assert "/manifest.webmanifest" in r.text
 
 
 def test_manifest_endpoint(client):
-    """Verify webmanifest returns 200 and JSON content."""
-    response = client.get("/manifest.webmanifest")
-    assert response.status_code == 200
-    assert "application/manifest+json" in response.headers.get("content-type", "")
-    data = response.json()
-    assert "ServiceWaze" in data.get("name", "")
+    r = client.get("/manifest.webmanifest")
+    assert r.status_code == 200
+    assert "application/manifest+json" in r.headers.get("content-type", "")
+    data = r.json()
     assert data.get("short_name") == "ServiceWaze"
+    assert data.get("display") == "standalone"
+    assert any(i["purpose"] == "maskable" for i in data["icons"])
+    assert len(data.get("shortcuts", [])) >= 2
 
 
-def test_service_worker_endpoint(client):
-    """Verify service worker script returns 200."""
-    response = client.get("/sw.js")
-    assert response.status_code == 200
-    assert "application/javascript" in response.headers.get("content-type", "")
-
-
-def test_services_directory_api(client):
-    """Verify /api/services returns structured emergency and municipal services."""
-    response = client.get("/api/services")
-    assert response.status_code == 200
-    data = response.json()
-    assert "services" in data
-    assert len(data["services"]) > 0
-
-
-def test_ussd_simulation_api(client):
-    """Verify USSD simulator endpoint returns menu options."""
-    response = client.get("/api/ussd?session=test-123&input=1")
-    assert response.status_code == 200
-    assert "ServiceWaze" in response.text or "Soweto" in response.text
+def test_service_worker_and_assets(client):
+    for path, needle in [("/sw.js", "sw-v3"), ("/static/css/app.css", "--accent"),
+                         ("/static/js/app.js", "ServiceWaze"),
+                         ("/static/icons/icon-192.png", None)]:
+        r = client.get(path)
+        assert r.status_code == 200, path
+        if needle:
+            assert needle in r.text, path
 
 
 def test_openapi_docs(client):
-    """Verify OpenAPI documentation endpoint works."""
-    response = client.get("/docs")
-    assert response.status_code == 200
+    assert client.get("/docs").status_code == 200
+
+
+# ----------------------------------------------------------------- core API
+def test_health(client):
+    d = client.get("/api/health").json()
+    assert d["ok"] is True and "version" in d
+
+
+def test_areas_search(client):
+    d = client.get("/api/areas?q=Soweto").json()
+    assert any("Soweto" in r["name"] for r in d["results"])
+    assert d["results"][0]["lat"] and d["results"][0]["lon"]
+
+
+def test_status_bundle(client):
+    d = client.get(f"/api/status?q=Soweto&device={DEVICE}").json()
+    for key in ("place", "weather", "electricity", "water", "impact", "grid", "cost", "meta"):
+        assert key in d, key
+    imp = d["impact"]
+    assert "threats" in imp and "plan" in imp and "risk" in imp
+    assert isinstance(imp["plan"]["tasks"], list)
+    assert d["place"]["name"].startswith("Soweto")
+
+
+def test_impact_produces_a_plan_that_fits(client):
+    d = client.get("/api/impact?q=Soweto").json()
+    plan = d["plan"]
+    assert plan["tasks"], "impact always returns at least one preparation task"
+    assert plan["minutes_left"] >= 0
+    assert plan["value_at_stake_rand"] >= 0
+    for t in plan["tasks"]:
+        assert {"id", "title", "minutes", "xp"} <= set(t)
+
+
+def test_services_directory(client):
+    d = client.get("/api/services").json()
+    for key in ("electricity", "water", "transport", "emergency", "food", "money"):
+        assert key in d["services"], key
+
+
+def test_ussd_simulation_api(client):
+    r = client.get("/api/ussd?session=test-123&input=1")
+    assert r.status_code == 200
+    assert "ServiceWaze" in r.text or "Soweto" in r.text
+
+
+# ------------------------------------------------------------- money engine
+def test_electricity_bill_uses_published_tariff(client):
+    d = client.get("/api/cost/electricity?kwh=350&tariff=eskom_homepower").json()
+    assert d["total"] > d["energy"]           # fixed charges included
+    assert 2.0 < d["blended_per_kwh"] < 6.0   # plausible rand/kWh for 2026/27
+
+
+def test_water_bill_honours_free_basic_water(client):
+    d = client.get("/api/cost/water?kl=6&city=johannesburg").json()
+    assert d["total"] == 0, "first 6 kl are free in Johannesburg"
+    more = client.get("/api/cost/water?kl=15&city=johannesburg").json()
+    assert more["total"] > 0
+    assert sum(l["kl"] for l in more["lines"]) == 9  # 15 kl used − 6 kl free
+
+
+def test_appliance_cost(client):
+    d = client.get("/api/cost/appliance?key=kettle&tariff=eskom_homepower").json()
+    assert d["kwh"] > 0 and d["cost"] > 0 and d["appliance"] == "kettle"
+
+
+def test_time_of_use_returns_cheapest_first(client):
+    d = client.get("/api/cost/tou?tariff=eskom_homeflex").json()
+    prices = [w["price"] for w in d["windows"]]
+    assert prices == sorted(prices)
+
+
+def test_food_basket(client):
+    d = client.get("/api/cost/basket?area=Johannesburg&people=4").json()
+    assert d["monthly"] > 0 and d["food_poverty_line_per_person"] > 0
+
+
+def test_harvest_and_solar(client):
+    h = client.get("/api/cost/harvest?lat=-26.2&lon=27.9&roof_m2=80").json()
+    assert h["litres"] >= 0 and "forecast_mm" in h
+    s = client.get("/api/cost/solar?lat=-26.2&lon=27.9&kwp=3").json()
+    assert s["kwh_per_day"] > 0 and s["payback_years"]
+
+
+def test_leak_detection():
+    # 10 L overnight with all taps closed = 1 L/h: normal (a toilet that is
+    # barely weeping) → "ok"
+    ok = [{"kl_total": 100.000, "at": "2026-09-01T20:00:00+00:00"},
+          {"kl_total": 100.010, "at": "2026-09-02T06:00:00+00:00"}]
+    assert tariffs.leak_check(ok)["verdict"] == "ok"
+    # 400 L overnight = 40 L/h continuous flow → almost certainly a leak
+    leaky = [{"kl_total": 100.0, "at": "2026-09-01T20:00:00+00:00"},
+             {"kl_total": 100.4, "at": "2026-09-02T06:00:00+00:00"}]
+    out = tariffs.leak_check(leaky)
+    assert out["verdict"] == "likely_leak"
+    assert out["monthly_kl_if_continuous"] > 20, "a leak this size wastes 20+ kl a month"
+
+
+# ------------------------------------------------------------- resilience
+def test_identity_is_pseudonymous_and_stable(client):
+    a = client.post(f"/api/me/identify?device={DEVICE}&area=Soweto").json()
+    b = client.post(f"/api/me/identify?device={DEVICE}&area=Soweto").json()
+    assert a["handle"] == b["handle"] and a["handle"].startswith("Neighbour ")
+
+
+def test_profile_updates_score(client):
+    before = client.get(f"/api/me/profile?device={DEVICE}").json()["score"]["score"]
+    r = client.post("/api/me/profile", json={"device": DEVICE, "people": 4, "water_l": 300,
+                                             "backup_light": 1, "food_days": 3, "route_plan": 1}).json()
+    assert r["score"]["score"] >= before
+
+
+def test_action_awards_xp(client):
+    before = client.get(f"/api/me/summary?device={DEVICE}").json()["level"]["xp"]
+    r = client.post("/api/me/action", json={"device": DEVICE, "action": "stored_water"}).json()
+    assert r["xp_earned"] > 0
+    after = client.get(f"/api/me/summary?device={DEVICE}").json()["level"]["xp"]
+    assert after == before + r["xp_earned"]
+
+
+def test_savings_ledger(client):
+    r = client.post("/api/me/savings", json={"device": DEVICE, "kind": "water",
+                                             "amount": 120.5, "note": "test"}).json()
+    assert r["total"] >= 120.5
+    assert any(e["kind"] == "water" for e in r["entries"])
+
+
+def test_badges_and_challenges(client):
+    assert client.get(f"/api/badges?device={DEVICE}").json()["badges"]
+    ch = client.get(f"/api/challenges?device={DEVICE}").json()
+    assert len(ch["challenges"]) == 3
+
+
+def test_leaderboard_aggregates_by_area(client):
+    d = client.get("/api/leaderboard").json()
+    assert "areas" in d and "neighbours" in d and d["totals"]["neighbours"] >= 1
+
+
+# ------------------------------------------------------------------- grid
+def test_grid_offer_claim_cycle(client):
+    title = "Pytest water offer"
+    r = client.post("/api/grid/add", json={"device": DEVICE, "kind": "water", "mode": "offer",
+                                           "title": title, "detail": "test", "area": "Testville"}).json()
+    assert r["ok"] and r["id"]
+    mine = client.get(f"/api/grid/mine?device={DEVICE}").json()
+    assert any(o["id"] == r["id"] for o in mine["mine"])
+    claimed = client.post("/api/grid/claim", json={"device": "pytest-other", "id": r["id"]}).json()
+    assert claimed["ok"]
+    dupe = client.post("/api/grid/claim", json={"device": DEVICE, "id": r["id"]})
+    assert dupe.status_code == 400, "you cannot claim your own listing"
+    assert client.post("/api/grid/close", json={"device": DEVICE, "id": r["id"]}).json()["ok"]
+
+
+def test_grid_is_area_scoped(client):
+    client.post("/api/grid/add", json={"device": DEVICE, "kind": "water", "mode": "offer",
+                                       "title": "Soweto only", "area": "Soweto"})
+    soweto = client.get("/api/grid?area=Soweto").json()
+    cape = client.get("/api/grid?area=Cape%20Town").json()
+    assert any("Soweto only" in o["title"] for o in soweto["offers"])
+    assert not any("Soweto only" in o["title"] for o in cape["offers"])
+
+
+def test_grid_points(client):
+    d = client.get("/api/grid/points?lat=-26.2485&lon=27.8546&kinds=water").json()
+    assert "points" in d
+
+
+def test_stokvel_flow(client):
+    name = "Pytest Tank Fund"
+    s = client.post("/api/stokvels", json={"device": DEVICE, "name": name, "purpose": "tank",
+                                           "area": "Testville", "target": 4500}).json()
+    assert s["id"]
+    c = client.post(f"/api/stokvels/{s['id']}/contribute",
+                    json={"device": DEVICE, "amount": 250}).json()
+    assert c["stokvel"]["saved"] == 250
+    detail = client.get(f"/api/stokvels/{s['id']}").json()["stokvel"]
+    assert detail["progress"] > 0 and detail["members_list"]
+
+
+def test_grid_stats(client):
+    d = client.get("/api/grid/stats").json()
+    assert "open_offers" in d and d["stokvel_rand"] >= 0
+
+
+# --------------------------------------------------------------- receipts
+def test_report_issues_receipt_with_sla(client):
+    r = client.post("/api/report", json={"area": "Testville", "kind": "no_water",
+                                         "message": "pytest", "device": DEVICE}).json()
+    assert r["id"] and r["receipt"]["ref"].startswith("SW-")
+    assert r["receipt"]["sla_hours"] == 24
+    assert r["receipt"]["entity"]
+
+
+def test_receipt_update_resolve_and_scorecard(client):
+    rid = client.post("/api/report", json={"area": "Testville", "kind": "leak",
+                                           "message": "pytest leak", "device": DEVICE}).json()["id"]
+    up = client.post(f"/api/receipt/{rid}/update", json={"text": "crew dispatched"}).json()
+    assert any("crew dispatched" in u["text"] for u in up["updates"])
+    res = client.post(f"/api/receipt/{rid}/resolve", json={"by": "pytest"}).json()
+    assert res["state"] == "resolved"
+    card = client.get("/api/scorecard?area=Testville").json()
+    assert card["total"] >= 1 and "sla_compliance" in card
+
+
+# ----------------------------------------------------------- transparency
+def test_source_health_console(client):
+    d = client.get("/api/sources/health").json()
+    assert "sources" in d and "summary" in d
+    assert isinstance(d["summary"]["total"], int)
+
+
+def test_i18n_bundle(client):
+    en = client.get("/api/i18n?lang=en").json()
+    zu = client.get("/api/i18n?lang=zu").json()
+    assert en["strings"]["water"] == "Water"
+    assert zu["strings"]["water"] == "Amanzi"
+    assert len(zu["languages"]) == 5
+
+
+def test_data_is_provenance_tagged(client):
+    d = client.get("/api/status?q=Soweto").json()
+    w = d["weather"]
+    assert "tier" in w and "live" in w and "source" in w
+    assert w["tier"] in ("live", "device", "cache", "sim")

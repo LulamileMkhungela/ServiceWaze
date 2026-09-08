@@ -1,125 +1,236 @@
-# ServiceWaze — Live Status Hub for South African Services (PWA)
+# ServiceWaze — South Africa's household resilience network
 
-**Electricity · Water · Weather & Air Quality · Government Transport · News & Social · Community Reports — all merged into one real-time feed.**
+> **Load-shedding ended. The service crisis didn't — it moved into water, roads, food prices and tariffs.**
+> ServiceWaze is the app that tells a household **what is coming, how long they have, what to do before it hits, who can help, what it costs, and whether anyone is going to fix it.**
 
-ServiceWaze answers the question people actually ask during service disruptions in South Africa: *"What's broken in my area right now, what do I do, and who do I report it to?"*
+A free, offline-capable PWA. No login, no tracking, no data selling. Five South African languages, WhatsApp and USSD channels, and every number on screen carries its source.
+
+```bash
+pip install -r requirements.txt
+cd servicewaze
+uvicorn app:app --port 8000
+# open http://localhost:8000  →  installable PWA
+```
+
+To see it with a populated neighbourhood: `python demo_seed.py` first (**demo data**, clearly labelled).
 
 ---
 
-## 🚀 Quickstart & Guide for Running the App
+## 1. The problem this actually solves
 
-### 1. Repository Structure
-All backend, PWA frontend, and data pipeline code is located in the **`servicewaze/`** directory:
+| Reality (2026) | Source |
+|---|---|
+| Joburg suburbs went **12+ days without water** after Rand Water maintenance | Daily Maverick, Jun 2026 |
+| SA's water system needs **R90-billion a year for a decade**; municipalities spent **R2.32bn** on emergency tankers in 2023/24 | Scrolla / Daily Maverick |
+| A household food basket costs **R5 530/month**; the food poverty line is **R868 per person** | PMBEJD (Jul 2026), Stats SA (2026) |
+| Electricity went up **8.76%** in April 2026; Homeflex winter peak is **R8.47/kWh** — 4.4× off-peak | Eskom Schedule of Standard Prices 2026/27 |
+| Municipal water rose **12.5%** (Joburg, FY2026/27) with a rising-block tariff: above 50 kl you pay **R94.92/kl** | CoJ Mayoral Committee Item 77 |
+
+The information exists. It is spread across a utility website, a WhatsApp line, a councillor's voice note and a neighbour's shout over the wall — and it arrives **after** the taps run dry.
+
+**ServiceWaze's bet:** the valuable moment is not the outage. It is the **two hours before** the outage, when a family can still fill a bath, charge a phone, move the meat into a cooler box, and warn the gogo next door.
+
+---
+
+## 2. What it does — the five loops
+
+```
+  PREDICT  →  PREPARE  →  SHARE  →  SAVE  →  PROVE
+  "in 3h"     "do now"    "I have"   "R saved"  "receipt #"
+```
+
+### PREDICT — the Prepare Window (`impact.py`)
+Fuses five signals into **one countdown per service**: weather forecasts, national load-shedding status, per-area schedules, time-decayed community reports, and official municipal notices. Every threat carries a **confidence score and its evidence**, because telling a family to fill 40 litres on a rumour is worse than silence.
+
+### PREPARE — a task list that fits the time left (`impact.py`)
+Not a generic checklist: the app computes **minutes available vs minutes needed** for *your* household (people, storage, roof, tank) and sizes the water-storage task from your actual tap flow. It tells you plainly when the plan **doesn't fit** — and what to drop.
+
+### SHARE — the Ubuntu Grid (`grid.py`)
+During a disruption the scarce resource is **capacity**, not information. Someone on your street has a borehole, a 5 000 L tank, a generator, a gas stove, a chest freezer, a bakkie, a spare seat or a plumber's wrench.
+* **OFFER** – "200 L borehole water, today 16:00–20:00"
+* **NEED** – "Drinking water for 5, two small children"
+* **CLAIM** – one tap, neighbour-verified, earns Ubuntu Points
+* **STOKVEL** – neighbours pool money for the thing that *ends* the outage: a tank, a solar kit, a bulk staple buy
+* **NEARBY** – real standpipes, clinics, food banks and markets pulled live from OpenStreetMap
+
+### SAVE — the money engine (`tariffs.py`)
+The only service app that shows you the **rand value** of a disruption and of a behaviour change, using the real published 2026/27 tariffs:
+* electricity bill breakdown (energy + fixed, blended R/kWh) across 8 tariffs
+* **time-of-use load shifting** — the cheapest hours ranked, with the real Homeflex peak/standard/off-peak rates
+* water bill against the real rising-block tariff, first 6 kl free
+* **rainwater harvesting**: roof area × live 3-day rainfall forecast = litres you can catch this week
+* **solar payback** from local irradiance, **appliance cost per use**, **leak detection** from two meter readings
+* food basket cost vs the food poverty line, per city
+* a **savings ledger** where users log what they avoided spending
+
+### PROVE — the accountability receipt (`receipts.py`)
+Every report becomes a tracked promise:
+
+```
+SW-7K3Q · Pimville Zone 1 · Burst pipe
+Logged with: Johannesburg Water · 0860 562 874
+SLA 24 h · Elapsed 31 h 12 min · OVERDUE
+```
+
+Receipts aggregate into a **ward scorecard**: open / fixed / overdue / average hours / SLA compliance by entity and by fault type. That is the artefact a municipality can be handed, and the reason this becomes a B2G product rather than another complaint box.
+
+---
+
+## 3. Gamification that changes behaviour (`resilience.py`)
+
+| Mechanic | Why it exists |
+|---|---|
+| **Resilience Score (0–100)** | Six transparent components (water stored, backup power, food buffer, route B, contacts/garden, community help). Shows exactly which action moves it. |
+| **XP + levels** | Seedling → Sprout → Umthi → Baobab → **Ubuntu Legend** |
+| **Ubuntu Points** | Earned by *helping others*: sharing, confirming, reporting, checking on the elderly |
+| **Weekly challenges** | Store 40 L · Share one thing · Log your meter · Run a 5-minute drill · Check on someone · Plan route B · Stock 3 days of food |
+| **9 badges** | Water Wise, First Responder, Grid Guardian, Stokvel Star, Night Owl, Money Mindful, Green Thumb, Street Captain, Ubuntu Legend |
+| **Area leaderboards** | Teams are *places*, not individuals — preparedness becomes a street competition, not vanity |
+| **Streaks & drills** | Quiet weeks are when preparation should happen |
+
+Identity is a hashed **device ID** with a friendly pseudonym ("Neighbour Brave uKhozi"). No email, no phone, no name. POPIA-friendly by construction.
+
+---
+
+## 4. Live data, with receipts
+
+Every value in the app carries a provenance envelope: `{value, source, tier, fetched_at, latency_ms, live}`.
+
+| Tier | Meaning |
+|---|---|
+| `live` | fetched by the ServiceWaze server from the upstream API now |
+| `device` | fetched by the **user's own browser** directly from a CORS-enabled API (keeps the server out of the critical path; works when the server's network is locked down) |
+| `cache` | upstream unreachable, last known good served |
+| `curated` | versioned, human-verified reference data (tariffs, emergency numbers) — every table is dated and cited |
+| `sim` | deterministic demo data, **always** badged `DEMO` in the UI |
+
+The in-app **Live sources** console (`/api/sources/health`) shows each connector's status, latency and last success. **ServiceWaze never invents a number and never hides where a number came from.**
+
+Connectors: Open-Meteo (forecast, air quality, geocoding), Nominatim (reverse geocode), RainViewer (radar), Eskom `GetStatus`, **EskomSePush** (`/status`, `/areas_search`, `/areas_nearby`, `/area_information/{id}/allowance|/event` — the same endpoints the category leader uses; set `ESP_API_TOKEN`), Johannesburg Water RSS, Google News SA, The Citizen, BusinessTech, Mastodon hashtags, **OpenStreetMap Overpass** (standpipes, clinics, markets).
+
+See **[docs/DATA_SOURCES.md](docs/DATA_SOURCES.md)** for the full table, keys and fallbacks.
+
+---
+
+## 5. Why this is not another status app
+
+| | EskomSePush & status apps | Municipal apps/lines | Community WhatsApp groups | **ServiceWaze** |
+|---|---|---|---|---|
+| Tells you **before** impact | ⚠️ schedule only | ❌ | ❌ | ✅ **Prepare Window countdown + task plan** |
+| Sized to your household | ❌ | ❌ | n/a | ✅ people, storage, roof, tank |
+| Cuts household cost | ❌ | ❌ | ❌ | ✅ real tariffs, load shifting, harvest, solar, leak detection |
+| Neighbour capacity sharing | ❌ | ❌ | ✅ but invisible/unstructured | ✅ **Ubuntu Grid + stokvels** |
+| Accountability receipt + SLA | ❌ | ⚠️ reference numbers only | ❌ | ✅ **public receipts + ward scorecard** |
+| Food access & food prices | ❌ | ❌ | ❌ | ✅ basket cost, food points, gardens |
+| Works on a R500 phone / no data | ❌ app-first | ⚠️ | ✅ | ✅ **PWA + USSD + WhatsApp, offline, data-saver** |
+| 11-language country | ❌ English | ⚠️ | ✅ | ✅ **5 languages shipped, 11 designed for** |
+| No login, no tracking | ✅ | ❌ | n/a | ✅ |
+
+Full analysis, including what we deliberately reuse from competitors: **[docs/COMPETITIVE_ANALYSIS.md](docs/COMPETITIVE_ANALYSIS.md)**.
+
+---
+
+## 6. Built for how South Africa actually connects
+
+* **PWA** — installable, ~45 kB app shell, service worker caches the shell and the last good data; works offline
+* **Low-data mode** — drops images, radar and non-essential calls
+* **USSD** (`*134*xxx#` logic in `ussd.py`) and **WhatsApp** (`whatsapp.py`, provider-agnostic) for feature phones
+* **Read aloud** — Web Speech API, for low-literacy and hands-free use
+* **Push** — Web Push/VAPID, fired *before* impact
+* **No login** for anything except writing in chat
+
+---
+
+## 7. Quickstart
+
+```bash
+git clone https://github.com/LulamileMkhungela/ServiceWaze.git
+cd ServiceWaze
+pip install -r requirements.txt
+cd servicewaze
+python demo_seed.py          # optional: populate a demo neighbourhood
+uvicorn app:app --port 8000  # → http://localhost:8000  |  /docs for OpenAPI
+```
+
+Environment (all optional — the app degrades gracefully without every one):
+
+| Variable | Effect |
+|---|---|
+| `ESP_API_TOKEN` | per-area load-shedding schedules & events (free tier at eskomsepush.org) |
+| `SW_LIVE=0` / `1` | force demo data / force live calls (default: auto-probe) |
+| `WA_PROVIDER`, `WA_PROVIDER_TOKEN` | real WhatsApp Business API delivery (otherwise dry-run outbox) |
+
+Tests: `pytest -q` (34 tests, no network required).
+
+---
+
+## 8. API (selection)
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/status?q=Soweto&device=…` | **the whole Now tab**: place, weather, air, power, water, transport, impact+countdown, grid, cost, you |
+| `GET /api/impact?q=…` | threats, confidence, evidence, task plan, minutes-left vs minutes-needed |
+| `GET /api/cost/electricity?kwh=350&area=…` · `/cost/water` · `/cost/basket` · `/cost/tou` · `/cost/harvest` · `/cost/solar` · `/cost/appliance` · `POST /cost/leak` | money engine |
+| `GET /api/grid?area=…` · `POST /api/grid/add` · `POST /api/grid/claim` · `GET /api/grid/points?lat=&lon=` | Ubuntu Grid + real OSM points |
+| `GET/POST /api/stokvels` · `POST /api/stokvels/{id}/contribute` | community savings pots |
+| `POST /api/report` → receipt · `GET /api/receipt/{id}` · `POST /api/receipt/{id}/resolve` · `GET /api/scorecard?area=` | accountability loop |
+| `GET /api/me/profile` · `POST /api/me/action` · `GET /api/me/summary` · `/api/badges` · `/api/challenges` · `/api/leaderboard` | resilience & gamification |
+| `GET /api/sources/health` · `GET /api/i18n?lang=zu` | transparency console, translations |
+
+---
+
+## 9. Repository layout
 
 ```
 ServiceWaze/
-├── README.md                           # This document (Overview & instructions)
-├── concepts/                           # Concept notes & design documentation
-└── servicewaze/                        # Main application directory
-    ├── app.py                          # FastAPI backend & PWA routes
-    ├── sources.py                      # Official live data sources (Eskom, Open-Meteo, geocoding)
-    ├── feeds.py                        # Merged news & social RSS/Mastodon pipeline
-    ├── transport.py                    # Government transport operator directory & status
-    ├── auth.py                         # Optional authentication & user sessions (for chat)
-    ├── push.py                         # Web Push notification service
-    ├── whatsapp.py & ussd.py           # WhatsApp outbox & USSD menu simulator
-    ├── requirements.txt                # Python dependencies
-    ├── test_app.py                     # Automated API & PWA tests
-    ├── static/                         # PWA manifest, service worker (sw.js), icons
-    └── templates/index.html            # Mobile-first PWA dashboard template
-```
-
-### 2. Running the App Locally
-
-Ensure you have **Python 3.9+** installed.
-
-```bash
-# 1. Clone the repository and enter the application directory
-git clone https://github.com/LulamileMkhungela/ServiceWaze.git
-cd ServiceWaze/servicewaze
-
-# 2. (Optional) Create and activate a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Start the FastAPI server
-uvicorn app:app --port 8000
-```
-
-Once the server is running:
-- Open your browser to **[http://localhost:8000](http://localhost:8000)** to view and install the PWA.
-- Interactive **OpenAPI / Swagger documentation** is available at **[http://localhost:8000/docs](http://localhost:8000/docs)**.
-
-### 3. Running Automated Tests
-
-Run automated backend and endpoint tests from the repository root:
-
-```bash
-pytest --ignore=servicewaze/browser_test.py --ignore=servicewaze/push_test.py --ignore=servicewaze/verify_asks.py
-```
-*(Note: `browser_test.py`, `push_test.py`, and `verify_asks.py` are end-to-end Playwright browser automation scripts that require a running server on port 8000).*
-
-### 4. Generating a Static Snapshot Preview
-
-You can bake live data into a standalone static HTML file (`preview.html`) that can be viewed offline without a server:
-
-```bash
-cd servicewaze
-# While the server is running on port 8000:
-python snapshot.py "Soweto"
+├── README.md                     ← you are here
+├── docs/
+│   ├── PITCH.md                  competition entry, judging-criteria mapping, demo script
+│   ├── COMPETITIVE_ANALYSIS.md   rivals, their strengths, what we reuse
+│   ├── DATA_SOURCES.md           every connector, endpoint, key, fallback
+│   └── ARCHITECTURE.md           request flow, data tiering, design decisions
+├── concepts/servicewaze-concept.md   original product thesis (2026)
+└── servicewaze/
+    ├── app.py                FastAPI app (73 endpoints) + PWA shell
+    ├── net.py                tiered live-data layer + provenance + health registry
+    ├── sim.py                deterministic demo data for offline operation
+    ├── impact.py             ★ Prepare Window: threats, confidence, task plan
+    ├── tariffs.py            ★ money engine: real 2026/27 tariffs, harvest, solar, food
+    ├── grid.py               ★ Ubuntu Grid + stokvels + OpenStreetMap points
+    ├── receipts.py           ★ accountability receipts, SLAs, ward scorecard
+    ├── resilience.py         ★ score, XP, levels, badges, challenges, savings ledger
+    ├── i18n.py               5 languages
+    ├── sources.py            weather, air, geocoding, Eskom, ESP, crowd reports
+    ├── feeds.py              merged news + social + official notices
+    ├── transport.py          government transport directory & status
+    ├── push.py / whatsapp.py / ussd.py / auth.py
+    ├── demo_seed.py          populate a demo neighbourhood
+    ├── static/{css,js,icons,sw.js,manifest.webmanifest}
+    └── templates/index.html  app shell
 ```
 
 ---
 
-## 🌟 What the App Does
+## 10. Impact model & business model
 
-ServiceWaze merges scattered South African utility and municipal data into a single, location-scoped dashboard:
+**North-star metric:** the **Actionable Alert Rate** — the share of alerts where the household actually did something (stored water, shifted load, rerouted, warned a neighbour), measured by the in-app "done" taps.
 
-- **📍 Multi-Location Watchlist & GPS-First:** Add any suburb or town in South Africa (e.g., *Soweto*, *Johannesburg*, *Cape Town*, *Durban*) or tap **"My location"** to auto-detect and reverse-geocode your GPS coordinates. Switch between areas with a single tap.
-- **⚡ Official Live Data Without API Keys:**
-  - **Load-shedding:** National Eskom stage via Eskom's `GetStatus` endpoint (with optional per-area schedules via `ESP_API_TOKEN`).
-  - **Weather & Forecasts:** Real-time temperatures, 3-day forecasts, sunrise/sunset, and automated advisories (heatwaves, heavy rain, wind) via Open-Meteo.
-  - **Air Quality (AQI):** Live PM2.5, PM10, ozone, and nitrogen dioxide levels via Open-Meteo Air Quality.
-  - **Rain Radar:** Direct link to live RainViewer radar tiles for your selected area.
-- **🚆 Dedicated Government Transport Tracking:**
-  - Comprehensive coverage across all provinces: **Prasa Metrorail** (Gauteng, Western Cape, KZN, Eastern Cape), **Gautrain & Gautrain Bus**, **Rea Vaya** (Joburg BRT), **A Re Yeng** (Tshwane BRT), **MyCiTi** (Cape Town BRT), **GO!Durban**, and **Shosholoza Meyl**.
-  - Displays live operator status badges, phone numbers, and timetable links.
-  - Smart Area Scoping: If a smaller suburb has no direct municipal transport hub, ServiceWaze suggests nearby major transport nodes.
-- **📰 Merged News & Social Stream:**
-  - Normalises updates from Google News SA, The Citizen, BusinessTech, and South African Mastodon hashtags (`#loadshedding`, `#randwater`, `#eskom`, `#prasa`, etc.) into a chronological feed.
-  - Strictly filtered by relevance (electricity, water, weather, transport, safety, municipal services).
-- **🗣️ Community Reports (Ground Truth):**
-  - Users can report real-time outages (no water, low pressure, power out, route disruption, leak) with optional photos.
-  - Neighbours can **confirm** reports, creating crowd-verified ground truth where official municipal APIs do not exist.
-  - Rate-limited and anonymous by default.
-- **💬 Free Reading & Account-Based Chat:**
-  - All status feeds, reports, and community chat messages can be read by anyone **without logging in** (POPIA-friendly).
-  - Users who wish to post in the chat can register a free account (no email required; PBKDF2-SHA256 password hashing).
-- **🌐 Multilingual & Accessible:**
-  - Available in **4 South African languages**: English (`EN`), isiZulu (`ZU`), isiXhosa (`XH`), and Sesotho (`ST`).
-  - Features **Text-to-Speech (Read Aloud)** using the Web Speech API to narrate area alerts and advisories hands-free.
-- **📱 Multi-Channel Reach:**
-  - **Progressive Web App (PWA):** ~30KB offline-capable app shell.
-  - **WhatsApp Sharing:** One-tap buttons to share formatted status updates or daily digests to WhatsApp contacts or groups.
-  - **USSD Simulator:** Feature-phone menu flow implemented in `ussd.py` (`GET /api/ussd?session=A&input=1`).
+**Free for residents forever.** Revenue comes from institutions:
+1. **B2G comms contracts** — a citizen channel that works, plus response analytics from the receipts
+2. **B2B API** — outage, disruption and cost feeds for logistics, insurers, retailers, security
+3. **Freemium for businesses** — multi-area monitoring, staff alerts, continuity checklists
+4. **Group-buy margin** — stokvel purchases (tanks, solar, staples) negotiated at volume
 
 ---
 
-## 🔌 API Reference
+## 11. Honest limitations
 
-When running `uvicorn app:app --port 8000`, the following REST endpoints are available:
+* No South African water utility publishes a real-time outage API. Water status is **community-verified ground truth + official notices**, never pretended to be an official feed.
+* Per-area load-shedding schedules need a free `ESP_API_TOKEN`; without it the app degrades to the national stage.
+* Prasa, Gautrain and BRT operators publish no open real-time feed — they are linked, with status inferred from news and community reports.
+* Tariff tables are curated and dated (`tariffs.AS_OF`); they must be refreshed each municipal year.
+* When no upstream is reachable, data is simulated and **labelled DEMO** in the UI.
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/status?q=Soweto` | `GET` | Returns full status bundle (place, weather, air quality, electricity, water, transport, reports) |
-| `/api/feed?areas=gauteng&limit=80` | `GET` | Returns merged news, social, and official notices feed |
-| `/api/services` | `GET` | Returns clickable emergency contacts, municipal directory, and preparedness checklists |
-| `/api/areas?q=Soweto` | `GET` | Search suburbs / reverse geocoding |
-| `/api/air?lat=-26.2&lon=27.9` | `GET` | Live air quality index and pollutant breakdown |
-| `/api/report` | `POST` | Submit a community report (`{area, kind, message, reporter, photo}`) |
-| `/api/confirm` | `POST` | Confirm a neighbour's report (`{id}`) |
-| `/api/ussd?session=A&input=1` | `GET` | USSD feature-phone menu simulator |
-| `/docs` | `GET` | OpenAPI / Swagger interactive documentation |
+---
+
+*Built in South Africa, for the way South Africa actually lives — on a prepaid meter, a shared street and a phone that has to last until payday.*

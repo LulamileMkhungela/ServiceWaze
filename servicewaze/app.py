@@ -1,7 +1,19 @@
-"""ServiceWaze — live status hub for South African services (PWA edition).
+"""ServiceWaze — South Africa's household resilience network (PWA, v3).
 
-Run:  uvicorn app:app --port 8000
+Run:  uvicorn app:app --host 0.0.0.0 --port 8000
 Docs: /docs  (OpenAPI)
+
+What changed from v2 (status hub) → v3 (resilience network)
+-----------------------------------------------------------
+v2 answered "what is broken near me?"  v3 answers:
+  * how long do I have before it hits me?        → impact.py   (Prepare Window)
+  * what must I do, in the time left?            → impact.py   (task plan)
+  * what will it cost me, and how do I cut it?   → tariffs.py  (money engine)
+  * who near me can help, and who needs help?    → grid.py     (Ubuntu Grid)
+  * will this ever get fixed, and by when?       → receipts.py (SLA receipts)
+  * am I getting better at this?                 → resilience.py (score, XP, badges)
+
+Everything is provenance-tagged (net.py): live / device / cache / curated / sim.
 """
 import asyncio
 import base64
@@ -24,11 +36,21 @@ from pydantic import BaseModel
 
 import auth
 import feeds
+import grid as grid_mod
+import i18n
+import impact
+import net
 import push
+import receipts
+import resilience
 import sources
+import tariffs
 import transport
 import ussd
 import whatsapp
+
+VERSION = "3.0.0"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,62 +58,170 @@ async def lifespan(app: FastAPI):
     yield
     task.cancel()
 
-app = FastAPI(title="ServiceWaze", version="2.1.0",
-              description="Live status for electricity, water, weather, transport, news & community reports — merged into one feed.",
-              lifespan=lifespan)
+
+app = FastAPI(
+    title="ServiceWaze",
+    version=VERSION,
+    description=("Household resilience network for South Africa: predict disruptions, prepare in "
+                 "time, share capacity with neighbours, cut household costs, and hold service "
+                 "delivery accountable."),
+    lifespan=lifespan,
+)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
-# naive per-IP throttle for crowd reports
 _report_ips = {}
 
-# --------------------------------------------------------------------------
-# PWA files
-# --------------------------------------------------------------------------
+
+def _throttle(request: Request, ip_key: str, limit: int, window: int = 3600):
+    ip = (request.client.host if request.client else "?") + "|" + ip_key
+    now = time.time()
+    _report_ips[ip] = [t for t in _report_ips.get(ip, []) if now - t < window]
+    if len(_report_ips[ip]) >= limit:
+        raise HTTPException(429, f"Slow down — max {limit} per hour.")
+    _report_ips[ip].append(now)
+
+
+def _device(request: Request, device: str = "") -> str:
+    return (device or request.headers.get("X-Device-Id") or "").strip()[:64] or "anon"
+
+
+# ---------------------------------------------------------------------------
+# PWA shell
+# ---------------------------------------------------------------------------
+@app.get("/", response_class=HTMLResponse)
+def index(request: Request):
+    return templates.TemplateResponse(request, "index.html", {
+        "boot": {"langs": i18n.languages(), "version": VERSION},
+    })
+
+
 @app.get("/manifest.webmanifest", include_in_schema=False)
 def manifest():
-    return FileResponse(os.path.join(BASE_DIR, "static/manifest.webmanifest"), media_type="application/manifest+json")
+    return FileResponse(os.path.join(BASE_DIR, "static/manifest.webmanifest"),
+                        media_type="application/manifest+json")
+
 
 @app.get("/sw.js", include_in_schema=False)
 def sw():
     return FileResponse(os.path.join(BASE_DIR, "static/sw.js"), media_type="application/javascript")
 
+
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
     return FileResponse(os.path.join(BASE_DIR, "static/icons/icon-192.png"), media_type="image/png")
 
-# --------------------------------------------------------------------------
-# API
-# --------------------------------------------------------------------------
+
+@app.get("/offline.html", response_class=HTMLResponse, include_in_schema=False)
+def offline(request: Request):
+    return templates.TemplateResponse(request, "index.html", {"boot": {"langs": i18n.languages()}})
+
+
+# ---------------------------------------------------------------------------
+# Places
+# ---------------------------------------------------------------------------
 @app.get("/api/health")
 def health():
-    return {"ok": True, "time": datetime.now(timezone.utc).isoformat()}
+    return {"ok": True, "version": VERSION, "time": datetime.now(timezone.utc).isoformat(),
+            "live": net.live_enabled()}
+
 
 @app.get("/api/areas")
 def areas(q: str):
     return {"results": sources.geocode(q)}
 
+
 @app.get("/api/reverse")
 def reverse(lat: float, lon: float):
     return {"place": sources.reverse_geocode(lat, lon)}
+
 
 @app.get("/api/radar")
 def radar(lat: float, lon: float):
     r = sources.radar(lat, lon)
     if not r:
-        raise HTTPException(502, "Radar source unavailable")
+        return {"radar": None, "note": "Radar unavailable (offline or upstream down)"}
     return {"radar": r}
 
-@app.get("/api/electricity/events")
-def electricity_events(q: str = "", lat: Optional[float] = None, lon: Optional[float] = None):
-    """Future load-shedding events for an area (needs ESP_API_TOKEN; graceful fallback)."""
-    ev = sources.esp_area_events(q.strip(), lat, lon)
-    if ev is None:
-        return {"events": None,
-                "hint": "Set ESP_API_TOKEN (free, eskomsepush.org) for area events",
-                "official": "https://loadshedding.eskom.co.za"}
-    return ev
 
+def _resolve_place(q: str = "", lat=None, lon=None) -> dict:
+    place = {"name": (q or "").strip() or "Selected location", "lat": lat, "lon": lon, "admin1": ""}
+    if ((lat is None or lon is None) and q.strip()) or (q.strip() and not place.get("admin1")):
+        geo = sources.geocode(q.strip(), count=1)
+        if geo:
+            g = geo[0]
+            place = {"name": f"{g['name']}, {g.get('admin1', '')}".strip(", "),
+                     "lat": g["lat"], "lon": g["lon"], "admin1": g.get("admin1", ""),
+                     "match": g}
+    return place
+
+
+# ---------------------------------------------------------------------------
+# THE BUNDLE — everything the "Now" tab needs in one round trip
+# ---------------------------------------------------------------------------
+@app.get("/api/status")
+def status(request: Request, q: str = "", lat: Optional[float] = None, lon: Optional[float] = None,
+           device: str = ""):
+    dev = _device(request, device)
+    place = _resolve_place(q, lat, lon)
+    w = sources.weather(place["lat"], place["lon"]) if place["lat"] is not None else None
+    elec = sources.eskom_status()
+    esp = sources.eskomsepush_status()
+    sched = sources.esp_area_schedule(q.strip(), place["lat"], place["lon"]) if (q or place["lat"]) else None
+    wins = sources.next_windows(sched) if sched else []
+    reports = sources.reports_for_area(place["lat"], place["lon"], q.strip()) if (
+        place["lat"] is not None or q.strip()) else []
+    aq = feeds.get_air(place["lat"], place["lon"]) if place["lat"] is not None else None
+    notices = [i for i in feeds.get_feed(categories=["water"], limit=12) if i.get("official")]
+    feed_items = feeds.get_feed(limit=40)
+    prof = resilience.get_profile(dev)
+    imp = impact.assess(place["name"], place["lat"], place["lon"], weather=w, air=aq,
+                        power={"status": elec}, water_reports=reports,
+                        feed_items=feed_items, profile=prof,
+                        schedule={"upcoming": wins} if wins else None)
+    glist = grid_mod.listings(area=place["name"].split(",")[0], lat=place["lat"], lon=place["lon"], limit=12)
+    return {
+        "place": place,
+        "weather": w,
+        "air": aq,
+        "electricity": {"status": elec, "esp": esp, "note": sources.ELECTRICITY_NOTE,
+                        "schedule": {"area": (sched or {}).get("area"), "upcoming": wins} if sched else None},
+        "water": {"official": sources.WATER_OFFICIAL, "context": sources.WATER_CONTEXT,
+                  "reports": reports, "official_notices": notices},
+        "transport": {"notices": sources.TRANSPORT_NOTICES, "links": sources.TRANSPORT_LINKS},
+        "impact": imp,
+        "grid": {"offers": glist["offers"][:6], "needs": glist["needs"][:6],
+                 "count": glist["count"], "stats": grid_mod.stats()},
+        "cost": {
+            "electricity_tariff": tariffs.tariff_for_area(place["name"]),
+            "water_city": tariffs.water_tariff_for_area(place["name"]),
+        },
+        "you": resilience.summary(dev, place["name"]) if dev else None,
+        "meta": {
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "live": net.live_enabled(),
+            "version": VERSION,
+        },
+    }
+
+
+@app.get("/api/impact")
+def api_impact(q: str = "", lat: Optional[float] = None, lon: Optional[float] = None, device: str = ""):
+    place = _resolve_place(q, lat, lon)
+    w = sources.weather(place["lat"], place["lon"]) if place["lat"] is not None else None
+    reports = sources.reports_for_area(place["lat"], place["lon"], q.strip())
+    prof = resilience.get_profile(device or "anon")
+    sched = sources.esp_area_schedule(q.strip(), place["lat"], place["lon"]) if (q or place["lat"]) else None
+    return impact.assess(place["name"], place["lat"], place["lon"], weather=w,
+                         air=feeds.get_air(place["lat"], place["lon"]) if place["lat"] is not None else None,
+                         power={"status": sources.eskom_status()}, water_reports=reports,
+                         feed_items=feeds.get_feed(limit=40), profile=prof,
+                         schedule={"upcoming": sources.next_windows(sched)} if sched else None)
+
+
+# ---------------------------------------------------------------------------
+# Service endpoints (single-purpose, used by the detail cards)
+# ---------------------------------------------------------------------------
 @app.get("/api/weather")
 def weather(lat: float, lon: float):
     w = sources.weather(lat, lon)
@@ -99,163 +229,411 @@ def weather(lat: float, lon: float):
         raise HTTPException(502, "Weather source unavailable")
     return w
 
+
 @app.get("/api/air")
 def air(lat: float, lon: float):
     return {"air": feeds.get_air(lat, lon)}
+
 
 @app.get("/api/electricity")
 def electricity():
     return {"status": sources.eskom_status(), "esp": sources.eskomsepush_status(),
             "note": sources.ELECTRICITY_NOTE}
 
+
 @app.get("/api/electricity/schedule")
 def electricity_schedule(q: str = "", lat: Optional[float] = None, lon: Optional[float] = None,
                          stage: Optional[int] = None, force: bool = False):
-    """Per-area load-shedding schedule (needs ESP_API_TOKEN; graceful fallback).
-    Returns upcoming windows within 7 days, optionally filtered by stage."""
     sched = sources.esp_area_schedule(q.strip(), lat, lon, force=force)
     if sched is None:
-        return {"schedule": None,
-                "hint": "Set ESP_API_TOKEN (free, eskomsepush.org) for per-area schedules",
+        return {"schedule": None, "hint": "Set ESP_API_TOKEN (free, eskomsepush.org) for per-area schedules",
                 "official": "https://loadshedding.eskom.co.za"}
-    wins = sources.next_windows(sched, stage=stage)
-    return {"schedule": {**sched, "upcoming": wins}}
+    return {"schedule": {**sched, "upcoming": sources.next_windows(sched, stage=stage)}}
+
+
+@app.get("/api/electricity/events")
+def electricity_events(q: str = "", lat: Optional[float] = None, lon: Optional[float] = None):
+    ev = sources.esp_area_events(q.strip(), lat, lon)
+    if ev is None:
+        return {"events": None, "hint": "Set ESP_API_TOKEN for area events",
+                "official": "https://loadshedding.eskom.co.za"}
+    return ev
+
 
 @app.get("/api/water")
 def water():
     return {"official": sources.WATER_OFFICIAL, "context": sources.WATER_CONTEXT,
             "reports": sources.recent_reports(40)}
 
+
 @app.get("/api/transport")
 def transport_api(q: str = "", lat: Optional[float] = None, lon: Optional[float] = None):
-    """Government transport for an area: services, live status from the merged
-    feed, community route reports, and nearby-area suggestions."""
-    place = {"name": q.strip() or "Selected location", "lat": lat, "lon": lon, "admin1": ""}
-    if q.strip():
-        geo = sources.geocode(q.strip(), count=1)
-        if geo:
-            place = {"name": f"{geo[0]['name']}, {geo[0]['admin1']}",
-                     "lat": geo[0]["lat"], "lon": geo[0]["lon"],
-                     "admin1": geo[0].get("admin1", "")}
+    place = _resolve_place(q, lat, lon)
     feed_items = feeds.get_feed(categories=["transport"], limit=40)
-    reps = sources.reports_for_area(place["lat"], place["lon"], q.strip()) if place["lat"] is not None or q.strip() else []
+    reps = sources.reports_for_area(place["lat"], place["lon"], q.strip())
     data = transport.transport_for_area(place["name"], place.get("admin1", ""),
                                         feed_items=feed_items, route_reports=reps)
     data["updated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     return data
 
+
 @app.get("/api/services")
 def services():
-    return {"services": feeds.SERVICES, "checklists": feeds.CHECKLISTS}
+    svc = {k: dict(v) for k, v in feeds.SERVICES.items()}
+    svc["food"] = {
+        "title": "Food access", "icon": "🥫",
+        "items": [
+            {"name": "SASSA (grants & pay points)", "type": "link",
+             "value": "https://www.sassa.gov.za", "note": "Grant dates & pay points"},
+            {"name": "SASSA toll-free", "type": "call", "value": "0800 60 10 11", "note": " Grants & queries"},
+            {"name": "FoodForward SA", "type": "link", "value": "https://www.foodforward.org.za",
+             "note": "Food bank network"},
+            {"name": "Department of Social Development", "type": "link",
+             "value": "https://www.gov.za/services/social-benefits", "note": "Social relief of distress"},
+            {"name": "Childline (child hunger/safety)", "type": "call", "value": "116", "note": "Free, 24h"},
+        ]}
+    svc["money"] = {
+        "title": "Household money", "icon": "💸",
+        "items": [
+            {"name": "National Credit Regulator", "type": "call", "value": "0860 627 627",
+             "note": "Free debt advice & reckless lending"},
+            {"name": "Debt counselling (NCR)", "type": "link", "value": "https://www.ncr.org.za",
+             "note": "Registered debt counsellors"},
+            {"name": "NERSA", "type": "link", "value": "https://www.nersa.org.za",
+             "note": "Electricity tariff regulator — dispute a tariff"},
+            {"name": "Consumer Goods & Services Ombud", "type": "call", "value": "0860 000 272",
+             "note": "Retail & food price complaints"},
+        ]}
+    return {"services": svc, "checklists": feeds.CHECKLISTS}
 
-# --------------------------------------------------------------------------
-# Push notifications (Web Push / VAPID)
-# --------------------------------------------------------------------------
-@app.get("/api/push/vapid")
-def push_vapid():
-    key = push.public_key()
-    if not key:
-        raise HTTPException(503, "VAPID not configured")
-    return {"public_key": key}
 
-class PushSubIn(BaseModel):
-    endpoint: str
-    keys: dict
-    area: str = ""
-
-@app.post("/api/push/subscribe")
-def push_subscribe(body: PushSubIn):
-    push.add_subscription(body.endpoint, body.keys.get("p256dh", ""),
-                          body.keys.get("auth", ""), body.area.strip())
-    return {"ok": True}
-
-@app.post("/api/push/test")
-def push_test():
-    n = push.send_test_push()
-    return {"ok": True, "sent": n, "subscribers": push.count_subscriptions()}
-
-# --------------------------------------------------------------------------
-# WhatsApp alerts (provider-agnostic; dry-run without credentials)
-# --------------------------------------------------------------------------
-class WAOptIn(BaseModel):
-    phone: str
-    area: str = ""
-
-@app.post("/api/whatsapp/optin")
-def wa_optin(body: WAOptIn):
-    digits = "".join(ch for ch in body.phone if ch.isdigit())
-    if len(digits) < 9:
-        raise HTTPException(400, "Invalid phone number")
-    whatsapp.opt_in(digits, body.area.strip())
-    return {"ok": True}
-
-class WATest(BaseModel):
-    phone: str = ""
-
-@app.post("/api/whatsapp/test")
-def wa_test(body: WATest):
-    digits = "".join(ch for ch in body.phone if ch.isdigit())
-    if not digits:
-        # test with first opt-in or a sample number
-        ins = whatsapp.list_optins()
-        digits = ins[0]["phone"] if ins else "27000000000"
-    res = whatsapp.send_test(digits)
-    return {"ok": True, **res}
-
-@app.get("/api/whatsapp/outbox")
-def wa_outbox(limit: int = 20):
-    return {"items": whatsapp.outbox(limit), "mode": whatsapp.PROVIDER}
-
-# --------------------------------------------------------------------------
-# USSD simulator (feature-phone channel)
-# --------------------------------------------------------------------------
-@app.get("/api/ussd")
-def ussd_menu(session: str = "", input: str = "", msisdn: str = ""):
-    text = ussd.handle(session or "test", input or "", msisdn or "")
-    return {"session": session or "test", "text": text}
-
+# ---------------------------------------------------------------------------
+# Feed
+# ---------------------------------------------------------------------------
 @app.get("/api/news")
 def news(limit: int = 40):
     return {"items": feeds.get_feed(types=["news"], limit=limit), "meta": feeds.feed_meta()}
+
 
 @app.get("/api/social")
 def social(limit: int = 20):
     return {"items": feeds.get_feed(types=["social"], limit=limit), "meta": feeds.feed_meta()}
 
+
 @app.get("/api/feed")
 def feed(areas: str = "", categories: str = "", q: str = "", limit: int = 80):
-    """The merged feed: news + social + everything, filterable."""
     a = [x for x in areas.split(",") if x.strip()] if areas else None
     c = [x for x in categories.split(",") if x.strip()] if categories else None
     items = feeds.get_feed(areas=a, categories=c, q=q.strip() or None, limit=limit)
     return {"items": items, "meta": feeds.feed_meta()}
 
-@app.get("/api/status")
-def status(q: str = "", lat: Optional[float] = None, lon: Optional[float] = None):
-    place = {"name": q.strip() or "Selected location", "lat": lat, "lon": lon}
-    if (lat is None or lon is None) and q.strip():
-        geo = sources.geocode(q.strip(), count=1)
-        if geo:
-            place = {"name": f"{geo[0]['name']}, {geo[0]['admin1']}",
-                     "lat": geo[0]["lat"], "lon": geo[0]["lon"], "match": geo[0]}
-    w = sources.weather(place["lat"], place["lon"]) if place["lat"] is not None else None
-    elec = sources.eskom_status()
-    esp = sources.eskomsepush_status()
-    reports = sources.reports_for_area(place["lat"], place["lon"], q.strip()) if place["lat"] is not None or q.strip() else []
-    aq = feeds.get_air(place["lat"], place["lon"]) if place["lat"] is not None else None
-    official_notices = [i for i in feeds.get_feed(categories=["water"], limit=10)
-                        if i.get("official")]
-    return {
-        "place": place,
-        "weather": w,
-        "air": aq,
-        "electricity": {"status": elec, "esp": esp, "note": sources.ELECTRICITY_NOTE},
-        "water": {"official": sources.WATER_OFFICIAL, "context": sources.WATER_CONTEXT,
-                  "reports": reports, "official_notices": official_notices},
-        "transport": {"notices": sources.TRANSPORT_NOTICES, "links": sources.TRANSPORT_LINKS},
-        "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    }
 
+# ---------------------------------------------------------------------------
+# Money engine
+# ---------------------------------------------------------------------------
+@app.get("/api/cost/electricity")
+def cost_electricity(kwh: float = 350, tariff: str = "", area: str = ""):
+    tid = tariff or tariffs.tariff_for_area(area)
+    return tariffs.electricity_bill(kwh, tid)
+
+
+@app.get("/api/cost/water")
+def cost_water(kl: float = 12, city: str = "", area: str = ""):
+    cid = city or tariffs.water_tariff_for_area(area)
+    return tariffs.water_bill(kl, cid)
+
+
+@app.get("/api/cost/appliance")
+def cost_appliance(key: str = "kettle", minutes: Optional[float] = None,
+                   tariff: str = "", area: str = ""):
+    tid = tariff or tariffs.tariff_for_area(area)
+    out = tariffs.appliance_cost(key, tid, minutes)
+    if "error" in out:
+        raise HTTPException(404, "unknown appliance")
+    return out
+
+
+@app.get("/api/cost/tou")
+def cost_tou(tariff: str = "eskom_homeflex"):
+    return {"windows": tariffs.cheapest_windows(tariff), "tariff": tariff,
+            "note": "Cheapest hours first — shift geyser, pool pump and washing into them."}
+
+
+@app.get("/api/cost/harvest")
+def cost_harvest(lat: float, lon: float, roof_m2: float = 60, runoff: float = 0.8):
+    w = sources.weather(lat, lon) or {}
+    daily = w.get("daily") or []
+    week_mm = sum(float(d.get("precip_sum") or 0) for d in daily)
+    out = tariffs.rain_harvest(roof_m2, week_mm, runoff)
+    out["forecast_mm"] = round(week_mm, 1)
+    out["daily"] = [{"date": d.get("date"), "mm": d.get("precip_sum"), "prob": d.get("precip_prob")}
+                    for d in daily]
+    out["tier"] = w.get("tier")
+    out["live"] = w.get("live")
+    return out
+
+
+@app.get("/api/cost/solar")
+def cost_solar(lat: float, lon: float, kwp: float = 3.0, tariff: str = "", area: str = ""):
+    tid = tariff or tariffs.tariff_for_area(area)
+    w = sources.weather(lat, lon) or {}
+    daily = w.get("daily") or []
+    rad = [float(d.get("radiation") or 0) for d in daily if d.get("radiation")]
+    # MJ/m² → kWh/kWp per day (÷3.6)
+    kwh_per_kwp = (sum(rad) / len(rad) / 3.6) if rad else 4.6
+    out = tariffs.solar_estimate(kwp, kwh_per_kwp, tid)
+    out["irradiance_kwh_per_kwp"] = round(kwh_per_kwp, 2)
+    out["tier"] = w.get("tier")
+    out["live"] = w.get("live")
+    return out
+
+
+@app.get("/api/cost/basket")
+def cost_basket(area: str = "", people: int = 4):
+    return tariffs.food_basket(area, people)
+
+
+class LeakIn(BaseModel):
+    readings: list[dict]
+
+
+@app.post("/api/cost/leak")
+def cost_leak(body: LeakIn):
+    return tariffs.leak_check(body.readings)
+
+
+@app.get("/api/cost/tariffs")
+def cost_tariffs():
+    return {"electricity": tariffs.ELECTRICITY_TARIFFS, "water": tariffs.WATER_TARIFFS,
+            "appliances": tariffs.APPLIANCES, "sources": tariffs.TARIFF_SOURCES,
+            "as_of": tariffs.AS_OF}
+
+
+# ---------------------------------------------------------------------------
+# Identity, profile, gamification
+# ---------------------------------------------------------------------------
+@app.post("/api/me/identify")
+def me_identify(request: Request, device: str = "", area: str = "", lang: str = "en"):
+    dev = _device(request, device)
+    return resilience.identify(dev, area, lang)
+
+
+class ProfileIn(BaseModel):
+    device: str = ""
+    people: Optional[int] = None
+    roof_m2: Optional[float] = None
+    water_l: Optional[float] = None
+    tank_l: Optional[float] = None
+    backup_light: Optional[int] = None
+    power_bank: Optional[int] = None
+    surge_protect: Optional[int] = None
+    solar: Optional[int] = None
+    food_days: Optional[int] = None
+    alt_cooking: Optional[int] = None
+    route_plan: Optional[int] = None
+    contacts_saved: Optional[int] = None
+    garden: Optional[int] = None
+
+
+@app.get("/api/me/profile")
+def me_profile(request: Request, device: str = ""):
+    dev = _device(request, device)
+    return {"device": dev, "profile": resilience.get_profile(dev),
+            "score": resilience.score(dev), "you": resilience.identify(dev)}
+
+
+@app.post("/api/me/profile")
+def me_profile_save(body: ProfileIn, request: Request):
+    dev = _device(request, body.device)
+    data = {k: v for k, v in body.model_dump().items() if k != "device" and v is not None}
+    prof = resilience.save_profile(dev, data)
+    return {"ok": True, "profile": prof, "score": resilience.score(dev)}
+
+
+class ActionIn(BaseModel):
+    device: str = ""
+    action: str
+    meta: str = ""
+    area: str = ""
+
+
+@app.post("/api/me/action")
+def me_action(body: ActionIn, request: Request):
+    dev = _device(request, body.device)
+    return {"ok": True, **resilience.act(dev, body.action.strip(), body.meta, body.area)}
+
+
+@app.get("/api/me/summary")
+def me_summary(request: Request, device: str = "", area: str = ""):
+    return resilience.summary(_device(request, device), area)
+
+
+class SavingIn(BaseModel):
+    device: str = ""
+    kind: str = "other"
+    amount: float = 0.0
+    note: str = ""
+
+
+@app.post("/api/me/savings")
+def me_savings_post(body: SavingIn, request: Request):
+    return resilience.log_saving(_device(request, body.device), body.kind,
+                                 body.amount, body.note)
+
+
+@app.get("/api/me/savings")
+def me_savings_get(request: Request, device: str = ""):
+    return resilience.savings(_device(request, device))
+
+
+@app.get("/api/badges")
+def badges(request: Request, device: str = ""):
+    return {"badges": resilience.badges(_device(request, device))}
+
+
+@app.get("/api/challenges")
+def challenges(request: Request, device: str = ""):
+    return resilience.challenges(_device(request, device))
+
+
+class ChallengeIn(BaseModel):
+    device: str = ""
+    id: str
+
+
+@app.post("/api/challenges/complete")
+def challenge_complete(body: ChallengeIn, request: Request):
+    return {"ok": True, **(resilience.complete_challenge(_device(request, body.device), body.id)
+                          or {})}
+
+
+@app.get("/api/leaderboard")
+def leaderboard(area: str = ""):
+    return resilience.leaderboard(area)
+
+
+# ---------------------------------------------------------------------------
+# Ubuntu Grid + stokvels
+# ---------------------------------------------------------------------------
+@app.get("/api/grid")
+def grid_listings(area: str = "", lat: Optional[float] = None, lon: Optional[float] = None,
+                  kind: str = "", limit: int = 40):
+    return grid_mod.listings(area, lat, lon, kind, limit)
+
+
+class GridIn(BaseModel):
+    device: str = ""
+    kind: str = "other"
+    mode: str = "offer"
+    title: str
+    detail: str = ""
+    area: str = ""
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    availability: str = ""
+
+
+@app.post("/api/grid/add")
+def grid_add(body: GridIn, request: Request):
+    dev = _device(request, body.device)
+    if len(body.title.strip()) < 3:
+        raise HTTPException(400, "title too short")
+    _throttle(request, "grid", 20)
+    you = resilience.identify(dev, body.area)
+    out = grid_mod.add(body.kind, body.mode, body.title.strip(), body.detail.strip(),
+                       body.area.strip(), body.lat, body.lon, dev, you["handle"], body.availability)
+    resilience.act(dev, "shared_resource" if body.mode == "offer" else "report",
+                   meta=body.title[:80], area=body.area)
+    return out
+
+
+@app.get("/api/grid/mine")
+def grid_mine(request: Request, device: str = ""):
+    return grid_mod.mine(_device(request, device))
+
+
+class ClaimIn(BaseModel):
+    device: str = ""
+    id: int
+
+
+@app.post("/api/grid/claim")
+def grid_claim(body: ClaimIn, request: Request):
+    dev = _device(request, body.device)
+    you = resilience.identify(dev)
+    out = grid_mod.claim(body.id, dev, you["handle"])
+    if not out.get("ok"):
+        raise HTTPException(400, out.get("error", "could not claim"))
+    resilience.act(dev, "shared_resource", meta=f"claimed #{body.id}")
+    return out
+
+
+@app.post("/api/grid/close")
+def grid_close(body: ClaimIn, request: Request):
+    return grid_mod.close(body.id, _device(request, body.device))
+
+
+@app.get("/api/grid/points")
+def grid_points(lat: float, lon: float, kinds: str = "water,food,care", radius: int = 4000):
+    return grid_mod.nearby(lat, lon, kinds, radius)
+
+
+@app.get("/api/grid/stats")
+def grid_stats():
+    return grid_mod.stats()
+
+
+@app.get("/api/stokvels")
+def stokvels(area: str = ""):
+    return grid_mod.stokvel_list(area)
+
+
+class StokvelIn(BaseModel):
+    device: str = ""
+    name: str
+    purpose: str = "tank"
+    area: str = ""
+    target: float = 4500
+
+
+@app.post("/api/stokvels")
+def stokvel_create(body: StokvelIn, request: Request):
+    dev = _device(request, body.device)
+    if len(body.name.strip()) < 3:
+        raise HTTPException(400, "name too short")
+    you = resilience.identify(dev, body.area)
+    out = grid_mod.stokvel_create(body.name.strip(), body.purpose, body.area.strip(),
+                                  body.target, dev, you["handle"])
+    resilience.act(dev, "stokvel_join", meta=body.name[:60], area=body.area)
+    return out
+
+
+class ContribIn(BaseModel):
+    device: str = ""
+    amount: float = 0
+
+
+@app.post("/api/stokvels/{sid}/contribute")
+def stokvel_contribute(sid: int, body: ContribIn, request: Request):
+    dev = _device(request, body.device)
+    if body.amount <= 0:
+        raise HTTPException(400, "amount must be positive")
+    you = resilience.identify(dev)
+    out = grid_mod.stokvel_contribute(sid, body.amount, dev, you["handle"])
+    if not out.get("ok"):
+        raise HTTPException(404, out.get("error", "not found"))
+    resilience.act(dev, "stokvel_contribute", meta=f"R{body.amount}", area="")
+    return out
+
+
+@app.get("/api/stokvels/{sid}")
+def stokvel_detail(sid: int):
+    return grid_mod.stokvel_detail(sid)
+
+
+# ---------------------------------------------------------------------------
+# Reports → receipts → scorecard
+# ---------------------------------------------------------------------------
 class ReportIn(BaseModel):
     area: str
     kind: str
@@ -263,8 +641,10 @@ class ReportIn(BaseModel):
     reporter: str = ""
     lat: Optional[float] = None
     lon: Optional[float] = None
-    photo: str = ""   # optional data URL (small)
-    audio: str = ""   # optional voice-note data URL
+    photo: str = ""
+    audio: str = ""
+    device: str = ""
+
 
 @app.post("/api/report")
 def report(body: ReportIn, request: Request):
@@ -272,12 +652,8 @@ def report(body: ReportIn, request: Request):
         raise HTTPException(400, f"kind must be one of {sorted(sources.REPORT_KINDS)}")
     if len(body.area.strip()) < 3:
         raise HTTPException(400, "area too short")
-    ip = request.client.host if request.client else "?"
-    now = time.time()
-    _report_ips[ip] = [t for t in _report_ips.get(ip, []) if now - t < 3600]
-    if len(_report_ips[ip]) >= 8:
-        raise HTTPException(429, "Too many reports — slow down (max 8/hour).")
-    _report_ips[ip].append(now)
+    dev = _device(request, body.device)
+    _throttle(request, "report", 8)
 
     photo_hex = None
     if body.photo:
@@ -286,7 +662,6 @@ def report(body: ReportIn, request: Request):
             photo_hex = base64.b64decode(raw)[:350000].hex()
         except Exception:
             photo_hex = None
-
     audio_hex, audio_mime = None, None
     if body.audio:
         try:
@@ -299,7 +674,22 @@ def report(body: ReportIn, request: Request):
     rid = sources.add_report(body.area.strip(), body.kind, body.message.strip(),
                              body.reporter.strip(), body.lat, body.lon)
     sources.attach_media(rid, photo_hex=photo_hex, audio_hex=audio_hex, audio_mime=audio_mime)
-    return {"id": rid, "ok": True}
+    resilience.act(dev, "report", meta=f"{body.kind}:{body.area[:40]}", area=body.area.strip())
+    return {"id": rid, "ok": True, "receipt": receipts.issue(rid, body.area.strip(), body.kind)}
+
+
+class ConfirmIn(BaseModel):
+    id: int
+    device: str = ""
+
+
+@app.post("/api/confirm")
+def confirm(body: ConfirmIn, request: Request):
+    if not sources.confirm_report(body.id):
+        raise HTTPException(404, "report not found")
+    resilience.act(_device(request, body.device), "confirm", meta=f"#{body.id}")
+    return {"ok": True, "receipt": receipts.receipt(body.id)}
+
 
 @app.get("/api/photo/{rid}")
 def photo(rid: int):
@@ -310,8 +700,8 @@ def photo(rid: int):
     con.close()
     if not row or not row[0]:
         raise HTTPException(404, "no photo")
-    img = bytes.fromhex(row[0])
-    return Response(content=img, media_type="image/jpeg")
+    return Response(content=bytes.fromhex(row[0]), media_type="image/jpeg")
+
 
 @app.get("/api/audio/{rid}")
 def audio(rid: int):
@@ -322,86 +712,172 @@ def audio(rid: int):
     con.close()
     if not row or not row[0]:
         raise HTTPException(404, "no voice note")
-    data = bytes.fromhex(row[0])
-    return Response(content=data, media_type=row[1] or "audio/ogg")
+    return Response(content=bytes.fromhex(row[0]), media_type=row[1] or "audio/ogg")
 
-class ConfirmIn(BaseModel):
-    id: int
 
-@app.post("/api/confirm")
-def confirm(body: ConfirmIn):
-    ok = sources.confirm_report(body.id)
-    if not ok:
-        raise HTTPException(404, "report not found")
+@app.get("/api/receipts")
+def api_receipts(area: str = "", limit: int = 25):
+    return {"receipts": receipts.list_receipts(area, limit)}
+
+
+@app.get("/api/receipt/{rid}")
+def api_receipt(rid: int):
+    r = receipts.receipt(rid)
+    if not r:
+        raise HTTPException(404, "not found")
+    return r
+
+
+class UpdateIn(BaseModel):
+    text: str
+    by: str = "community"
+
+
+@app.post("/api/receipt/{rid}/update")
+def api_receipt_update(rid: int, body: UpdateIn):
+    out = receipts.update(rid, body.text.strip(), body.by[:40])
+    if not out.get("ok"):
+        raise HTTPException(404, "not found")
+    return out
+
+
+class ResolveIn(BaseModel):
+    by: str = "community"
+    device: str = ""
+
+
+@app.post("/api/receipt/{rid}/resolve")
+def api_receipt_resolve(rid: int, body: ResolveIn, request: Request):
+    out = receipts.resolve(rid, body.by[:40])
+    if not out.get("ok"):
+        raise HTTPException(404, "not found")
+    resilience.act(_device(request, body.device), "resolved_report", meta=f"#{rid}")
+    return out
+
+
+@app.get("/api/scorecard")
+def api_scorecard(area: str = ""):
+    return receipts.scorecard(area)
+
+
+# ---------------------------------------------------------------------------
+# Source transparency console
+# ---------------------------------------------------------------------------
+@app.get("/api/sources/health")
+def sources_health():
+    return net.health()
+
+
+@app.post("/api/sources/set-live")
+def sources_set_live(flag: bool = True):
+    """Manual override of the live/demo switch (used by the in-app console)."""
+    net.set_live(flag)
+    return {"live": net.live_enabled()}
+
+
+class DeviceFetchIn(BaseModel):
+    name: str
+    ok: bool
+    latency_ms: Optional[int] = None
+    note: str = ""
+    url: str = ""
+
+
+@app.post("/api/sources/device")
+def sources_device(body: DeviceFetchIn):
+    """The PWA reports a browser-side (CORS) fetch back to the server so the
+    source console reflects what the device itself pulled live."""
+    net.mark_device(body.name, body.ok, body.latency_ms, body.note, body.url)
     return {"ok": True}
 
-# --------------------------------------------------------------------------
-# Community chat (area-scoped, moderated; writing requires login)
-# --------------------------------------------------------------------------
+
+class DeviceDataIn(BaseModel):
+    name: str
+    url: str
+    params: dict = {}
+    data: dict = {}
+    latency_ms: Optional[int] = None
+
+
+@app.post("/api/device/data")
+def device_data(body: DeviceDataIn):
+    """A CORS-enabled reading pulled by the user's own browser, handed to the
+    server so that impact, costs and advisories are computed from real data
+    even when the ServiceWaze host has no outbound internet."""
+    if not body.name or not body.url:
+        raise HTTPException(400, "name and url are required")
+    return net.inject(body.name, body.url, body.params, body.data,
+                      tier="device", latency_ms=body.latency_ms)
+
+
+@app.get("/api/i18n")
+def api_i18n(lang: str = "en"):
+    return {"lang": lang, "strings": i18n.bundle(lang), "languages": i18n.languages()}
+
+
+# ---------------------------------------------------------------------------
+# Chat (read free, write with login) — unchanged from v2.6
+# ---------------------------------------------------------------------------
 class ChatIn(BaseModel):
     area: str
     message: str
     lat: Optional[float] = None
     lon: Optional[float] = None
 
+
 def _token_from(request: Request):
     h = request.headers.get("Authorization", "")
-    if h.lower().startswith("bearer "):
-        return h[7:].strip()
-    return None
+    return h[7:].strip() if h.lower().startswith("bearer ") else None
 
-@app.post("/api/chat")
-def chat_post(body: ChatIn, request: Request):
-    username = auth.verify_token(_token_from(request))
-    if not username:
-        raise HTTPException(401, "Login required to write in chat")
-    if len(body.area.strip()) < 3:
-        raise HTTPException(400, "area too short")
-    if len(body.message.strip()) < 2:
-        raise HTTPException(400, "message too short")
-    ip = request.client.host if request.client else "?"
-    now = time.time()
-    _report_ips[ip] = [t for t in _report_ips.get(ip, []) if now - t < 3600]
-    if len(_report_ips[ip]) >= 10:
-        raise HTTPException(429, "Too many messages — slow down (max 10/hour).")
-    _report_ips[ip].append(now)
-    rid = sources.add_chat(body.area.strip(), body.message, username,
-                           body.lat, body.lon)
-    if rid is None:
-        raise HTTPException(400, "message could not be saved")
-    return {"id": rid, "ok": True}
 
 @app.get("/api/chat")
 def chat_get(q: str = "", lat: Optional[float] = None, lon: Optional[float] = None, limit: int = 40):
     msgs = sources.chats_for_area(lat, lon, q.strip()) if (lat is not None or q.strip()) else []
     return {"messages": msgs[:limit]}
 
+
+@app.post("/api/chat")
+def chat_post(body: ChatIn, request: Request):
+    username = auth.verify_token(_token_from(request))
+    if not username:
+        raise HTTPException(401, "Login required to write in chat")
+    if len(body.area.strip()) < 3 or len(body.message.strip()) < 2:
+        raise HTTPException(400, "area or message too short")
+    _throttle(request, "chat", 10)
+    rid = sources.add_chat(body.area.strip(), body.message, username, body.lat, body.lon)
+    if rid is None:
+        raise HTTPException(400, "message could not be saved")
+    return {"id": rid, "ok": True}
+
+
 class ChatReportIn(BaseModel):
     id: int
+
 
 @app.post("/api/chat/report")
 def chat_report(body: ChatReportIn, request: Request):
     if not auth.verify_token(_token_from(request)):
         raise HTTPException(401, "Login required to flag messages")
-    ok = sources.report_chat(body.id)
-    if not ok:
+    if not sources.report_chat(body.id):
         raise HTTPException(404, "message not found")
     return {"ok": True}
 
-# --------------------------------------------------------------------------
-# Auth (username + password; login needed to WRITE in chat)
-# --------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
 class AuthIn(BaseModel):
     username: str
     password: str
+
 
 @app.post("/api/auth/register")
 def auth_register(body: AuthIn):
     username, err = auth.register(body.username, body.password)
     if err:
         raise HTTPException(400, err)
-    token = auth.login(username, body.password)
-    return {"ok": True, "token": token, "username": username}
+    return {"ok": True, "token": auth.login(username, body.password), "username": username}
+
 
 @app.post("/api/auth/login")
 def auth_login(body: AuthIn):
@@ -410,10 +886,12 @@ def auth_login(body: AuthIn):
         raise HTTPException(401, "Invalid username or password")
     return {"ok": True, "token": token, "username": body.username.strip()}
 
+
 @app.post("/api/auth/logout")
 def auth_logout(request: Request):
     auth.logout(_token_from(request))
     return {"ok": True}
+
 
 @app.get("/api/auth/me")
 def auth_me(request: Request):
@@ -422,36 +900,69 @@ def auth_me(request: Request):
         raise HTTPException(401, "Not logged in")
     return {"username": username}
 
-# --------------------------------------------------------------------------
-# Web UI
-# --------------------------------------------------------------------------
-@app.get("/", response_class=HTMLResponse)
-def index(request: Request):
-    return templates.TemplateResponse(request, "index.html",
-                                      {"boot": {}, "static_mode": False})
 
-@app.get("/snapshot.html", response_class=HTMLResponse)
-def snapshot(request: Request):
-    """Static snapshot (data baked in) for offline preview."""
-    try:
-        from urllib.parse import urlencode
-        import urllib.request
-        port = request.url.port or 8000
-        q = request.query_params.get("q", "Soweto")
-        base = f"http://127.0.0.1:{port}"
-        def get(path):
-            with urllib.request.urlopen(base + path, timeout=12) as r:
-                return r.read().decode()
-        status_data = json_loads(get("/api/status?" + urlencode({"q": q})))
-        feed_data = json_loads(get("/api/feed?limit=60"))
-        svc_data = json_loads(get("/api/services"))
-        boot = {"status": status_data, "feed": feed_data, "services": svc_data}
-        return templates.TemplateResponse(request, "index.html",
-                                          {"boot": boot, "static_mode": True})
-    except Exception:
-        return templates.TemplateResponse(request, "index.html",
-                                          {"boot": {}, "static_mode": True})
+# ---------------------------------------------------------------------------
+# Push, WhatsApp, USSD — multi-channel reach
+# ---------------------------------------------------------------------------
+@app.get("/api/push/vapid")
+def push_vapid():
+    key = push.public_key()
+    if not key:
+        raise HTTPException(503, "VAPID not configured")
+    return {"public_key": key}
 
-import json as _json
-def json_loads(s):
-    return _json.loads(s)
+
+class PushSubIn(BaseModel):
+    endpoint: str
+    keys: dict
+    area: str = ""
+
+
+@app.post("/api/push/subscribe")
+def push_subscribe(body: PushSubIn):
+    push.add_subscription(body.endpoint, body.keys.get("p256dh", ""),
+                          body.keys.get("auth", ""), body.area.strip())
+    return {"ok": True}
+
+
+@app.post("/api/push/test")
+def push_test():
+    return {"ok": True, "sent": push.send_test_push(), "subscribers": push.count_subscriptions()}
+
+
+class WAOptIn(BaseModel):
+    phone: str
+    area: str = ""
+
+
+@app.post("/api/whatsapp/optin")
+def wa_optin(body: WAOptIn):
+    digits = "".join(ch for ch in body.phone if ch.isdigit())
+    if len(digits) < 9:
+        raise HTTPException(400, "Invalid phone number")
+    whatsapp.opt_in(digits, body.area.strip())
+    return {"ok": True}
+
+
+class WATest(BaseModel):
+    phone: str = ""
+
+
+@app.post("/api/whatsapp/test")
+def wa_test(body: WATest):
+    digits = "".join(ch for ch in body.phone if ch.isdigit())
+    if not digits:
+        ins = whatsapp.list_optins()
+        digits = ins[0]["phone"] if ins else "27000000000"
+    return {"ok": True, **whatsapp.send_test(digits)}
+
+
+@app.get("/api/whatsapp/outbox")
+def wa_outbox(limit: int = 20):
+    return {"items": whatsapp.outbox(limit), "mode": whatsapp.PROVIDER}
+
+
+@app.get("/api/ussd")
+def ussd_menu(session: str = "", input: str = "", msisdn: str = ""):
+    return {"session": session or "test",
+            "text": ussd.handle(session or "test", input or "", msisdn or "")}

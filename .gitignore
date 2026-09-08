@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Runtime data (SQLite DB, push keys, outbox) — never commit
+servicewaze/data/*.db
+servicewaze/data/*.json
+servicewaze/data/*.log
+
+# Generated previews
+servicewaze/preview*.html

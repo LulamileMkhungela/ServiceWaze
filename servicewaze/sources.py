@@ -21,31 +21,42 @@ UA = {"User-Agent": "ServiceWaze/1.0 (community status hub; contact: admin@local
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 DB_PATH = os.path.join(DATA_DIR, "servicewaze.db")
 
+import net  # noqa: E402  (tiered live-data layer: live → cache → demo)
+import sim  # noqa: E402  (deterministic demo data when upstream is unreachable)
+
+
+def _place_meta(env) -> dict:
+    """Tiny provenance envelope used by the UI source badges."""
+    return {"source": env.get("source"), "tier": env.get("tier"),
+            "live": env.get("live"), "fetched_at": env.get("fetched_at")}
+
+
 # --------------------------------------------------------------------------
 # Geocoding (Open-Meteo, keyless)
 # --------------------------------------------------------------------------
 def geocode(query: str, count: int = 6):
+    """Search South African places. Falls back to the offline gazetteer."""
+    env = net.fetched(
+        "https://geocoding-api.open-meteo.com/v1/search", "Open-Meteo Geocoding",
+        ttl=24 * 3600, params={"name": query, "count": count, "language": "en", "format": "json"},
+        sim=lambda: sim.geocode(query, count), timeout=10,
+    )
+    data = env.get("data")
+    results = []
     try:
-        r = requests.get(
-            "https://geocoding-api.open-meteo.com/v1/search",
-            params={"name": query, "count": count, "language": "en", "format": "json"},
-            headers=UA, timeout=10,
-        )
-        j = r.json()
-        results = []
-        for item in j.get("results", []):
+        for item in (data or {}).get("results", []):
             if item.get("country_code") != "ZA":
                 continue
             results.append({
-                "name": item.get("name"),
-                "admin1": item.get("admin1", ""),
-                "admin2": item.get("admin2", ""),
-                "lat": item.get("latitude"),
-                "lon": item.get("longitude"),
+                "name": item.get("name"), "admin1": item.get("admin1", ""),
+                "admin2": item.get("admin2", ""), "lat": item.get("latitude"),
+                "lon": item.get("longitude"), **_place_meta(env),
             })
-        return results
     except Exception:
-        return []
+        results = []
+    if not results:
+        results = sim.geocode(query, count)
+    return results
 
 # --------------------------------------------------------------------------
 # Weather (Open-Meteo, keyless)
@@ -81,18 +92,18 @@ def _advise(daily):
     return advisories
 
 def weather(lat, lon):
+    env = net.fetched(
+        "https://api.open-meteo.com/v1/forecast", "Open-Meteo Forecast", ttl=600,
+        params={
+            "latitude": lat, "longitude": lon,
+            "current": "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m",
+            "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_gusts_10m_max,uv_index_max,shortwave_radiation_sum,sunrise,sunset",
+            "forecast_days": 4, "timezone": "Africa/Johannesburg",
+        },
+        headers=UA, timeout=12, sim=lambda: sim.weather(lat, lon),
+    )
     try:
-        r = requests.get(
-            "https://api.open-meteo.com/v1/forecast",
-            params={
-                "latitude": lat, "longitude": lon,
-                "current": "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m",
-                "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_gusts_10m_max,uv_index_max,sunrise,sunset",
-                "forecast_days": 3, "timezone": "Africa/Johannesburg",
-            },
-            headers=UA, timeout=12,
-        )
-        j = r.json()
+        j = env.get("data") or {}
         cur = j.get("current", {})
         code = cur.get("weather_code", 0)
         desc, icon = WMO.get(code, ("Unknown", "🌡️"))
@@ -109,6 +120,8 @@ def weather(lat, lon):
                 "precip_prob": j["daily"]["precipitation_probability_max"][i],
                 "precip_sum": j["daily"]["precipitation_sum"][i],
                 "gusts": j["daily"]["wind_gusts_10m_max"][i],
+                "uv": (j["daily"].get("uv_index_max") or [None] * 10)[i],
+                "radiation": (j["daily"].get("shortwave_radiation_sum") or [None] * 10)[i],
                 "sunrise": sr[11:16] if sr else None,
                 "sunset": ss[11:16] if ss else None,
             })
@@ -123,10 +136,12 @@ def weather(lat, lon):
             },
             "daily": daily,
             "advisories": _advise(daily),
-            "source": "Open-Meteo",
+            **_place_meta(env),
         }
     except Exception:
-        return None
+        out = sim.weather(lat, lon)
+        out.update({"tier": "sim", "live": False, "source": "ServiceWaze demo model"})
+        return out
 
 # --------------------------------------------------------------------------
 # Reverse geocoding (Nominatim, free — cached + throttled)
@@ -142,22 +157,25 @@ def reverse_geocode(lat, lon):
     if now - _last_nom[0] < 1.1:
         time.sleep(1.1 - (now - _last_nom[0]))
     _last_nom[0] = time.time()
+    env = net.fetched("https://nominatim.openstreetmap.org/reverse", "Nominatim reverse geocode",
+                      ttl=24 * 3600,
+                      params={"lat": lat, "lon": lon, "format": "json", "zoom": 16, "addressdetails": 1},
+                      sim=lambda: sim.reverse_geocode(lat, lon), timeout=10)
     try:
-        r = requests.get("https://nominatim.openstreetmap.org/reverse",
-                         params={"lat": lat, "lon": lon, "format": "json", "zoom": 16,
-                                 "addressdetails": 1},
-                         headers=UA, timeout=10)
-        j = r.json()
-        a = j.get("address", {})
+        a = (env.get("data") or {}).get("address", {})
         name = (a.get("suburb") or a.get("neighbourhood") or a.get("town")
-                or a.get("city") or a.get("village") or a.get("hamlet") or "My location")
+                or a.get("city") or a.get("village") or a.get("hamlet"))
         state = a.get("state", "")
-        out = {"name": name, "state": state,
-               "display": f"{name}, {state}" if state else name}
+        if not name:
+            raise ValueError("no address")
+        out = {"name": name, "state": state, "display": f"{name}, {state}" if state else name,
+               **_place_meta(env)}
         _rev_cache[key] = (time.time(), out)
         return out
     except Exception:
-        return {"name": "My location", "state": "", "display": "My location"}
+        out = sim.reverse_geocode(lat, lon)
+        _rev_cache[key] = (time.time(), out)
+        return out
 
 # --------------------------------------------------------------------------
 # Rain radar (RainViewer, free keyless)
@@ -208,25 +226,24 @@ def eskom_status():
     # last-known-good cache (5 min) — Eskom's endpoint is occasionally flaky
     if time.time() - _eskom_cache["t"] < 300 and _eskom_cache["val"] is not None:
         return _eskom_cache["val"]
+    env = net.fetched("https://loadshedding.eskom.co.za/loadshedding/GetStatus",
+                      "Eskom GetStatus", ttl=300, kind="text",
+                      sim=lambda: sim.eskom_stage(), timeout=8)
+    raw = str(env.get("data") or "").strip()
     try:
-        r = requests.get("https://loadshedding.eskom.co.za/loadshedding/GetStatus", headers=UA, timeout=8)
-        raw = r.text.strip()
-        try:
-            stage = int(raw)
-        except ValueError:
-            stage = None
-        if stage is None:
-            out = {"stage": "unknown", "label": "Status unavailable", "source": "Eskom"}
-        elif stage in (-1, 0):
-            out = {"stage": 0, "label": "No load-shedding", "source": "Eskom"}
-        else:
-            out = {"stage": stage, "label": f"Stage {stage}", "source": "Eskom"}
-        _eskom_cache.update({"t": time.time(), "val": out})
-        return out
-    except Exception:
+        stage = int(raw)
+    except ValueError:
+        stage = None
+    if stage is None:
         if _eskom_cache["val"] is not None:
-            return _eskom_cache["val"]  # serve last known good on failure
-        return {"stage": "unknown", "label": "Status unavailable", "source": "Eskom"}
+            return _eskom_cache["val"]
+        out = {"stage": "unknown", "label": "Status unavailable", **_place_meta(env)}
+    elif stage in (-1, 0):
+        out = {"stage": 0, "label": "No load-shedding", **_place_meta(env)}
+    else:
+        out = {"stage": stage, "label": f"Stage {stage}", **_place_meta(env)}
+    _eskom_cache.update({"t": time.time(), "val": out})
+    return out
 
 def eskomsepush_status():
     token = os.environ.get("ESP_API_TOKEN")

@@ -1,18 +1,25 @@
 {
-  "name": "ServiceWaze — Live service status & news",
+  "name": "ServiceWaze — household resilience network",
   "short_name": "ServiceWaze",
-  "description": "Live status for electricity, water, weather, transport and news for your area. Free, low-data, no login.",
+  "description": "Predict water, power and transport disruptions, prepare in time, share with neighbours and cut household costs. Free, low-data, no login.",
   "start_url": "/",
+  "id": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0d1117",
-  "theme_color": "#0d1117",
+  "background_color": "#080d17",
+  "theme_color": "#080d17",
   "lang": "en",
-  "categories": ["utilities", "news", "weather"],
+  "dir": "ltr",
+  "categories": ["utilities", "weather", "news", "social", "finance", "shopping"],
   "icons": [
-    {"src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-    {"src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-    {"src": "/static/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Report an outage", "short_name": "Report", "url": "/?action=report", "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Prepare list", "short_name": "Prepare", "url": "/?tab=prepare", "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Ubuntu Grid", "short_name": "Grid", "url": "/?tab=grid", "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }
