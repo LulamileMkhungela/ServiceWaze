@@ -383,3 +383,121 @@ TARIFF_SOURCES = [
     {"name": "Stats SA national poverty lines 2026",
      "url": "https://www.statssa.gov.za/?page_id=959"},
 ]
+
+def prepaid_runway(units_left: float, daily_kwh: float = 10.0, tariff_id: str = "eskom_homepower",
+                   area: str = "", outage_hours_per_day: float = 0.0,
+                   fbe_kwh_per_month: float = 0.0, topup_rand: float = 0.0,
+                   target_days: int = 0) -> dict:
+    """How many days of electricity are left on the meter, and when it runs out.
+
+    Prepaid is how most South African households actually buy power, and the
+    question everyone asks at the kitchen table is not "what is the tariff?" —
+    it is **"how long will these units last, and will they reach month end?"**
+
+    Model:
+        daily_net = daily_kwh − (load-shedding displaces part of the day's use)
+        days_left = units_left / daily_net
+        rand      = kWh × unit price at the current time-of-use slot
+
+    Load shedding *saves* units (a fridge does not run in the dark) but costs
+    food, so the displacement factor (0.6) is documented, not hidden.
+    """
+    try:
+        units_left = max(0.0, float(units_left))
+    except Exception:
+        units_left = 0.0
+    try:
+        daily_kwh = max(0.2, float(daily_kwh))
+    except Exception:
+        daily_kwh = 10.0
+    try:
+        outage = max(0.0, min(24.0, float(outage_hours_per_day or 0)))
+    except Exception:
+        outage = 0.0
+
+    DISPLACEMENT = 0.6          # share of an average hour's use not consumed during an outage
+    daily_displaced = daily_kwh * (outage / 24.0) * DISPLACEMENT
+    daily_net = max(0.2, daily_kwh - daily_displaced)
+
+    p = unit_price(tariff_id)
+    price = float(p.get("price") or 0.0)
+    now = datetime.now(timezone(timedelta(hours=2)))
+
+    days_left = round(units_left / daily_net, 1) if daily_net else 0
+    runout = now + timedelta(days=days_left)
+
+    # month-end target — the date every prepaid household is really managing to
+    next_month = (now.replace(day=28) + timedelta(days=7)).replace(day=1)
+    month_end = next_month - timedelta(days=1)
+    days_to_month_end = max(0.0, round((month_end - now).total_seconds() / 86400, 1))
+    units_needed_month = round(daily_net * days_to_month_end, 1)
+    shortfall = round(max(0.0, units_needed_month - units_left), 1)
+    fbe_left = 0.0
+    if fbe_kwh_per_month:
+        day_of_month = now.day
+        days_in_month = (next_month - timedelta(days=1)).day
+        fbe_accrued = fbe_kwh_per_month * (day_of_month / days_in_month)
+        fbe_left = round(max(0.0, fbe_accrued - max(0.0, fbe_kwh_per_month - units_left)), 1)
+
+    target = int(target_days or 0)
+    units_for_target = round(daily_net * target, 1) if target else 0.0
+    rand_for_target = round(units_for_target * price, 2) if target else 0.0
+    topup_units = round(topup_rand / price, 1) if (topup_rand and price) else 0.0
+    topup_days = round(topup_units / daily_net, 1) if daily_net and topup_units else 0.0
+
+    state = "ok"
+    if days_left < 2:
+        state = "critical"
+    elif days_left < 5:
+        state = "low"
+    elif shortfall > 0:
+        state = "short_of_month_end"
+
+    advice = []
+    if state == "critical":
+        advice.append("Less than two days left — top up today, or move the geyser and stove off electricity now.")
+    if shortfall > 0:
+        advice.append("You are " + str(shortfall) + " units short of month end — about R" +
+                      str(round(shortfall * price, 2)) + ".")
+    else:
+        advice.append("These units reach month end with about " +
+                      str(round(units_left - units_needed_month, 1)) + " units to spare.")
+    if outage:
+        advice.append("Load shedding is saving you about " + str(round(daily_displaced, 1)) +
+                      " units a day — and risking the food in your fridge.")
+    if fbe_kwh_per_month:
+        advice.append("Free Basic Electricity: " + str(fbe_kwh_per_month) +
+                      " kWh/month is applied before your units are used if you are registered.")
+    advice.append("Cheapest hours are early morning and late evening — heating water in a peak hour costs several times more.")
+
+    return {
+        "tariff": p.get("tariff"), "tariff_id": tariff_id, "price_per_kwh": round(price, 4),
+        "slot": p.get("slot"), "as_of": AS_OF,
+        "units_left": round(units_left, 1),
+        "daily_kwh": round(daily_kwh, 2),
+        "daily_net_kwh": round(daily_net, 2),
+        "outage_hours_per_day": round(outage, 1),
+        "displaced_kwh_per_day": round(daily_displaced, 2),
+        "days_left": days_left,
+        "runs_out": runout.strftime("%Y-%m-%d %H:%M"),
+        "runs_out_in_days": days_left,
+        "cost_per_day": round(daily_net * price, 2),
+        "cost_per_month": round(daily_net * price * 30.4, 2),
+        "month_end": month_end.strftime("%Y-%m-%d"),
+        "days_to_month_end": days_to_month_end,
+        "units_needed_to_month_end": units_needed_month,
+        "shortfall_units": shortfall,
+        "shortfall_rand": round(shortfall * price, 2),
+        "surplus_units": round(max(0.0, units_left - units_needed_month), 1),
+        "topup_rand": round(topup_rand, 2), "topup_units": topup_units, "topup_days": topup_days,
+        "units_for_target_days": units_for_target,
+        "rand_for_target_days": rand_for_target,
+        "fbe_kwh_per_month": fbe_kwh_per_month,
+        "state": state,
+        "advice": advice,
+        "basis": ("days = units ÷ (daily use − load-shedding displacement of 0.6 × outage hours); "
+                  "rand = kWh × " + str(round(price, 4)) + " (" + str(p.get("basis", "")) + "). "
+                  "Meter service charges and municipal fixed charges are not included; add them if your "
+                  "statement shows one."),
+        "area": area,
+    }

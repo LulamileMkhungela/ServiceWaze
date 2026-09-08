@@ -463,6 +463,11 @@
       </div>
 
       <div class="card tight">
+        <h2>⚡ ${esc("Prepaid runway")} <span class="spacer"></span><span class="badge">${esc("month end")}</span></h2>
+        <div id="prepaidBox"><div class="skeleton"></div></div>
+      </div>
+
+      <div class="card tight">
         <h2>⚡ ${esc("Load-shedding windows")}</h2>
         <div id="schedBox"><div class="skeleton"></div></div>
       </div>
@@ -488,6 +493,7 @@
     loadCost("elec");
     loadProfile();
     renderSchedule();
+    renderPrepaid();
     $("#solarBtn").onclick = loadSolar;
     $("#harvestBtn2").onclick = openHarvest;
   }
@@ -1056,7 +1062,10 @@
       <label class="fl">Area</label><input id="rArea" value="${esc(a ? a.name.split(",")[0] : "")}">
       <div class="grid3 mt8" id="kinds">${kinds.map(([k, lb], i) =>
       `<button class="btn sm ${i === 0 ? "cyan" : "ghost"}" data-k="${k}">${esc(lb)}</button>`).join("")}</div>
-      <label class="fl">What's happening?</label><textarea id="rMsg" rows="2" placeholder="e.g. no water since 06:00, Zone 3"></textarea>
+      <label class="fl">What's happening?</label>
+      <div style="display:flex;gap:6px;align-items:flex-start">
+        <textarea id="rMsg" rows="2" style="flex:1" placeholder="e.g. no water since 06:00, Zone 3"></textarea>
+        <button class="btn sm ghost" id="rVoice" title="Speak your report">🎤</button></div>
       <label class="fl">Photo (optional)</label><input type="file" id="rPhoto" accept="image/*">
       <div class="grid2 mt12"><button class="btn ghost" id="rCancel">${esc(t("cancel", "Cancel"))}</button>
       <button class="btn primary" id="rSend">${esc(t("send", "Send report"))}</button></div>`;
@@ -1196,6 +1205,14 @@
     loadQueue();
     applyA11y();
     const sosTop = $("#sosBtn"); if (sosTop) sosTop.onclick = openSos;
+    wireSpeak();
+    try {
+      if (typeof MutationObserver !== "undefined") {
+        const host = document.querySelector("#app") || document.body;
+        new MutationObserver(() => { try { wireSpeak(); } catch (e) {} })
+          .observe(host, { childList: true, subtree: true });
+      }
+    } catch (e) {}
     try {
       const wk = JSON.parse(localStorage.getItem("sw_walk") || "null");
       if (wk && new Date(wk.due).getTime() > Date.now()) scheduleWalkAlarm(wk);
@@ -1699,6 +1716,7 @@
     root.setAttribute("data-text", st.textSize || "normal");
     root.setAttribute("data-contrast", st.contrast || "normal");
     root.setAttribute("data-motion", st.motion || "full");
+    root.setAttribute("data-simple", st.simple || "normal");
   }
 
   function a11yControls() {
@@ -1714,6 +1732,9 @@
           <span class="switchbtn ${st.contrast === "high" ? "on" : ""}" data-contrast="high"><i></i></span></div>
         <div class="kv"><span>${esc("Reduce motion")}</span>
           <span class="switchbtn ${st.motion === "reduced" ? "on" : ""}" data-motion="reduced"><i></i></span></div>
+        <div class="kv"><span>${esc("Simple mode")}</span>
+          <span class="switchbtn ${st.simple === "on" ? "on" : ""}" data-simple="on"><i></i></span></div>
+        <div class="tiny mt8">${esc("Simple mode hides small print and shows only the big icons and actions — for first-time, low-literacy or shared-phone use.")}</div>
         <div class="tiny mt8">${esc("Every screen is labelled for screen readers and every button is at least 44 px tall.")}</div>
       </div>`;
   }
@@ -1728,6 +1749,10 @@
     });
     $$("[data-motion]").forEach((b) => b.onclick = () => {
       S.settings.motion = S.settings.motion === "reduced" ? "full" : "reduced";
+      saveSettings(); applyA11y(); renderYou();
+    });
+    $$("[data-simple]").forEach((b) => b.onclick = () => {
+      S.settings.simple = S.settings.simple === "on" ? "normal" : "on";
       saveSettings(); applyA11y(); renderYou();
     });
   }
@@ -1968,6 +1993,133 @@
     } catch (e) {
       box.innerHTML = `<div class="muted">Safety unavailable.</div>`;
     }
+  }
+
+
+  /* =========================================================== PREPAID POWER
+     Prepaid is how most SA households actually buy electricity, and the
+     question at the kitchen table is not "what is the tariff?" — it is "how
+     long will these units last and will they reach month end?" */
+  function prepaidPrefs() {
+    try { return Object.assign({ units: 0, daily: 12, fbe: 0, topup: 200 },
+                               JSON.parse(localStorage.getItem("sw_prepaid") || "{}")); } catch (e) { return { units: 0, daily: 12, fbe: 0, topup: 200 }; }
+  }
+
+  async function renderPrepaid() {
+    const box = $("#prepaidBox"); if (!box) return;
+    const a = activeArea(); if (!a) return;
+    const p = prepaidPrefs();
+    if (!p.units) {
+      box.innerHTML = `<div class="empty" style="padding:12px"><span class="e">⚡</span>${
+        esc("How many units are left on your meter? We'll tell you when it runs out.")}</div>
+        <button class="btn wide primary sm mt8" id="ppSetup">${esc("Set my meter")}</button>`;
+      $("#ppSetup").onclick = openPrepaidSheet;
+      return;
+    }
+    try {
+      const d0 = S.data[a.name] || {};
+      const stage = ((d0.electricity || {}).status || {}).stage || 0;
+      const outage = stage ? stage * 2 : 0;      // stage 4 ≈ 8 h/day worst case
+      const j = await api(`/api/cost/prepaid?units=${p.units}&daily=${p.daily}&area=${encodeURIComponent(a.name)}` +
+        `&outage=${outage}&fbe=${p.fbe}&topup=${p.topup}`);
+      const cls = j.state === "critical" ? "b-bad" : j.state === "low" || j.state === "short_of_month_end" ? "b-warn" : "b-ok";
+      const pct = Math.max(2, Math.min(100, Math.round(j.units_left / Math.max(1, j.units_needed_to_month_end) * 100)));
+      box.innerHTML = `
+        <div class="between"><div>
+          <div class="big num">${j.days_left} ${esc("days left")}</div>
+          <div class="tiny">${esc("runs out " + j.runs_out + " · " + j.daily_net_kwh + " units/day")}</div></div>
+          <div style="text-align:right"><div class="tiny">${esc("to month end")}</div>
+            <div class="num"><b>${j.units_needed_to_month_end}</b> ${esc("units")}</div></div></div>
+        <div class="bar2 mt8"><i class="${cls}" style="width:${pct}%"></i></div>
+        <div class="kv"><span>${esc("Units left")}</span><b class="num">${j.units_left}</b></div>
+        <div class="kv"><span>${esc("Cost per day")}</span><b class="num">${rand(j.cost_per_day, 2)}</b></div>
+        ${j.shortfall_rand > 0 ? `<div class="kv"><span>${esc("Short of month end")}</span><b class="num" style="color:var(--bad)">${rand(j.shortfall_rand, 2)}</b></div>`
+          : `<div class="kv"><span>${esc("Spare at month end")}</span><b class="num" style="color:var(--ok)">${j.surplus_units} ${esc("units")}</b></div>`}
+        ${j.topup_rand ? `<div class="kv"><span>${esc("If you buy " + rand(j.topup_rand, 0))}</span><b class="num">${j.topup_units} ${esc("units · " + j.topup_days + " days")}</b></div>` : ""}
+        ${(j.advice || []).slice(0, 3).map((x) => `<div class="tiny mt8">• ${esc(x)}</div>`).join("")}
+        <button class="btn wide sm ghost mt8" id="ppEdit">${esc("Update my meter")}</button>`;
+      $("#ppEdit").onclick = openPrepaidSheet;
+    } catch (e) {
+      box.innerHTML = `<div class="muted">Prepaid estimate unavailable.</div>`;
+    }
+  }
+
+  function openPrepaidSheet() {
+    const p = prepaidPrefs();
+    const sheet = $("#sheet");
+    sheet.innerHTML = `<div class="grab"></div><h3>⚡ ${esc("My prepaid meter")}</h3>
+      <p class="muted" style="margin:0 0 8px">${esc("Type the units left on your meter — or read them out with the microphone.")}</p>
+      <label class="fl">${esc("Units left (kWh)")}</label>
+      <div style="display:flex;gap:6px"><input id="ppUnits" type="number" inputmode="numeric" value="${p.units || ""}" placeholder="e.g. 120">
+        <button class="btn sm ghost" id="ppVoice" title="Speak instead of typing">🎤</button></div>
+      <label class="fl">${esc("Units you use per day")}</label><input id="ppDaily" type="number" inputmode="numeric" value="${p.daily}">
+      <label class="fl">${esc("Free Basic Electricity (kWh/month, 0 if none)")}</label><input id="ppFbe" type="number" inputmode="numeric" value="${p.fbe || 0}">
+      <label class="fl">${esc("Top-up you're considering (R)")}</label><input id="ppTop" type="number" inputmode="numeric" value="${p.topup}">
+      <div class="grid2 mt12"><button class="btn ghost" id="ppCancel">${esc(t("cancel", "Cancel"))}</button>
+      <button class="btn primary" id="ppSave">${esc("Work it out")}</button></div>`;
+    $("#overlay").classList.add("on");
+    $("#ppCancel").onclick = closeSheet;
+    $("#ppVoice").onclick = () => voiceInto($("#ppUnits"), "How many units are left on the meter?");
+    $("#ppSave").onclick = () => {
+      const prefs = { units: +$("#ppUnits").value || 0, daily: +$("#ppDaily").value || 12,
+                      fbe: +$("#ppFbe").value || 0, topup: +$("#ppTop").value || 0 };
+      localStorage.setItem("sw_prepaid", JSON.stringify(prefs));
+      closeSheet(); renderPrepaid();
+    };
+  }
+
+  /* ======================================================= VOICE & LITERACY
+     A country with 11 languages and a wide literacy gap cannot be served by an
+     app that only speaks English and only accepts typing. Two things:
+     read-aloud on every card, and press-to-speak instead of typing. */
+  const LANG_TAG = { en: "en-ZA", zu: "zu-ZA", xh: "xh-ZA", st: "st-ZA", af: "af-ZA" };
+
+  function speak(text) {
+    if (!window.speechSynthesis) return toast("Reading aloud is not supported in this browser");
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(String(text).slice(0, 900));
+      u.lang = LANG_TAG[S.lang] || "en-ZA";
+      u.rate = 0.96;
+      window.speechSynthesis.speak(u);
+      toast("🔊 Reading…");
+    } catch (e) { toast("Could not read aloud"); }
+  }
+
+  function wireSpeak() {
+    if (!S.settings.readAloud && S.settings.readAloud !== undefined) { /* still offer the button */ }
+    $$(".card").forEach((card) => {
+      const h = card.querySelector("h2");
+      if (!h || card.querySelector("[data-speak]")) return;
+      const b = document.createElement("button");
+      b.className = "speakbtn";
+      b.dataset.speak = "1";
+      b.textContent = "🔊";
+      b.setAttribute("aria-label", "Read this card aloud");
+      b.title = "Read this card aloud";
+      b.onclick = (ev) => { ev.stopPropagation(); speak(card.innerText); };
+      h.appendChild(b);
+    });
+  }
+
+  function voiceInto(input, promptText) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return toast("Voice typing is not supported in this browser — please type instead");
+    if (promptText) toast(promptText);
+    try {
+      const rec = new SR();
+      rec.lang = LANG_TAG[S.lang] || "en-ZA";
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.onresult = (ev) => {
+        let txt = "";
+        for (const res of ev.results) txt += res[0].transcript;
+        input.value = txt.replace(/[^\d.]/g, "").slice(0, 8) || txt.slice(0, 80);
+      };
+      rec.onerror = () => toast("Could not hear you — try again or type it");
+      rec.start();
+      toast("🎤 Listening…");
+    } catch (e) { toast("Voice typing unavailable"); }
   }
 
   document.addEventListener("DOMContentLoaded", boot);

@@ -205,6 +205,16 @@ def list_receipts(area: str = "", limit: int = 25) -> list[dict]:
     return out
 
 
+def areas(limit: int = 60) -> list[dict]:
+    """Areas with tracked reports — for the public council dashboard."""
+    con = _db()
+    rows = con.execute("""SELECT area, COUNT(*) n FROM reports
+                          WHERE TRIM(COALESCE(area,'')) <> ''
+                          GROUP BY area ORDER BY n DESC LIMIT ?""", (limit,)).fetchall()
+    con.close()
+    return [{"area": r[0], "reports": r[1]} for r in rows]
+
+
 def scorecard(area: str = "") -> dict:
     """Ward accountability: how many promises were kept, and how fast."""
     items = list_receipts(area, 200)

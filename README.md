@@ -63,6 +63,20 @@ The only service app that shows you the **rand value** of a disruption and of a 
 * food basket cost vs the food poverty line, per city
 * a **savings ledger** where users log what they avoided spending
 
+### RUNWAY — prepaid electricity (`tariffs.prepaid_runway`)
+Most South African households buy power prepaid, and the real question is not "what is the tariff?" but
+**"how long will these units last, and will they reach month end?"** Enter the units on your meter and
+ServiceWaze answers it with the real 2026/27 price, including the awkward truth that **load shedding saves
+units** (a fridge does not run in the dark) while it risks the food:
+
+```
+120 units · 11.8 days left · runs out 20 Sep 20:13 · 10.2 units/day
+Cost per day R30,09 · Short of month end R277,89 · If you buy R200 → 67.8 units (5.9 days)
+```
+
+It also plans the top-up ("R… to reach month end"), accounts for **Free Basic Electricity** (50 kWh/month
+where registered), and documents every assumption in a `basis` string.
+
 ### SAFE — personal safety & GBV (`safety.py`)
 The hackathon's second problem statement is *Public Safety & Gender-Based Violence: prevent GBV,
 strengthen emergency response and trust in safety systems.* Every other entry in this space reads a
@@ -91,6 +105,9 @@ lets the street see who has gone quiet, and turns *concern* into a knock on a do
 only, never names, numbers or locations of people.
 
 ### PROVE — the accountability receipt (`receipts.py`)
+…and the **council dashboard** (`/council`): a public, printable, per-area service-delivery report with
+SLA compliance by entity and by fault type, plus a **CSV/JSON export** (`/api/scorecard/export`) for a
+councillor, a ward committee or a depot. That is what turns a complaint box into a B2G product.
 Every report becomes a tracked promise:
 
 ```
@@ -134,6 +151,9 @@ predict likely future behaviour from patterns in data?"*
 | **7-day schedule grid + heads-up alarms** | Prepare | 60-minute and 15-minute warnings **before** the lights go, with the 7-day window grid. Without a per-area feed it falls back to an explicitly-labelled estimate derived from the national stage. |
 | **Offline report queue** (`static/js/app.js`) | everywhere | Reports, offers and chat are queued on the device when signal dies and flushed automatically on reconnect — the network fails exactly when you need to report. |
 | **Accessibility controls** | You → Make it easier to use | Text size A/A+/A++, high contrast, reduced motion, 44 px targets, focus rings, screen-reader labels — adjustable **inside** the app, not buried in OS settings. |
+| **Read-aloud & voice** | every card, every report | 🔊 reads any card out loud in the chosen language; 🎤 lets you **speak** a report or your meter reading instead of typing it. A country with 11 languages and a wide literacy gap cannot be served by a typing-only app. |
+| **Simple mode** | You → accessibility | Hides the small print, doubles the tap targets and keeps only the big icons and actions — for first-time, low-literacy or shared-phone use. |
+| **Council dashboard** | `/council` | Public, printable per-area service-delivery report with CSV export — the B2G artefact. |
 | **Interactive onboarding** | first run | Three *do it now* steps (add your street → tick a prep task → offer something) that earn XP, instead of three slides nobody reads. |
 | **Watch circle** (`watch.py`) | Community | *"Is she okay?"* — the loop no status app closes. Name the neighbours you look out for (pseudonyms only), tap **I'm safe**, and the street sees who has been quiet for 48 h (amber) or 72 h (**please knock**). A neighbour's check-in is a claim, never a GPS ping. |
 
@@ -255,7 +275,7 @@ ServiceWaze/
 │   └── ARCHITECTURE.md           request flow, data tiering, design decisions
 ├── concepts/servicewaze-concept.md   original product thesis (2026)
 └── servicewaze/
-    ├── app.py                FastAPI app (96 endpoints) + PWA shell
+    ├── app.py                FastAPI app (98 endpoints) + PWA shell
     ├── net.py                tiered live-data layer + provenance + health registry
     ├── sim.py                deterministic demo data for offline operation
     ├── impact.py             ★ Prepare Window: threats, confidence, task plan

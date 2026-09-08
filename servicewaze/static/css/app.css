@@ -398,3 +398,13 @@ html[data-theme="light"] .card.safety h2 { color: #a3000a; }
 a.item.tapcall { display: block; text-decoration: none; color: inherit; }
 a.item.tapcall:active { transform: scale(.99); }
 .tiny.ok { color: var(--ok); } .tiny.warn { color: var(--warn); } .tiny.bad { color: var(--bad); }
+
+/* read-aloud on every card + simple (low-literacy) mode */
+.speakbtn { border: 0; background: transparent; color: var(--muted); font-size: 15px;
+  cursor: pointer; margin-left: 8px; padding: 4px 6px; border-radius: 8px; }
+.speakbtn:active { transform: scale(.92); }
+html[data-simple="on"] { font-size: 18px; }
+html[data-simple="on"] .tiny, html[data-simple="on"] .td, html[data-simple="on"] .sub { display: none; }
+html[data-simple="on"] .card h2 { font-size: 17px; }
+html[data-simple="on"] .btn { min-height: 52px; font-size: 16px; }
+html[data-simple="on"] .tile .vl { font-size: 18px; }

@@ -97,7 +97,7 @@
 | **Innovation** | Prepare Window (countdown *to* impact), provenance-tagged data, Ubuntu Grid, stokvels, real-tariff money engine |
 | **Problem solved / impact** | Water, power, transport, food, money — five of the six focus areas, end to end, with measurable rand saved |
 | **Usability / UI** | 5-tab thumb-first PWA, one-screen answer, zero setup, offline, data-saver, read-aloud, dark/light |
-| **Technical execution** | FastAPI + 96 endpoints, sqlite, tiered async fetch with caching and graceful degradation, service worker, Web Push, 50 automated tests, headless JS smoke test |
+| **Technical execution** | FastAPI + 98 endpoints, sqlite, tiered async fetch with caching and graceful degradation, service worker, Web Push, 54 automated tests, headless JS smoke test |
 | **Local relevance** | SA tariffs, SA municipalities, SA languages, SA food-basket data, SA transport operators |
 | **Scalability / sustainability** | B2G comms contracts, B2B API, business freemium, group-buy margin |
 | **Accessibility / inclusion** | USSD, WhatsApp, offline, low-data, 5 languages, no login, no tracking, POPIA design |
@@ -111,6 +111,11 @@
   *Public Safety & Gender-Based Violence* (SafeWalk, SOS with verified helplines, hazard → repair
   receipt). We could not find another entry that fuses them — and the fusion is the point: the same
   street that loses water at 18:00 is the street where the walk home is dark.
+* **It works for how households actually buy power.** Prepaid runway: enter the units on the meter, get
+  days left, the run-out date, the rand shortfall to month end and the cost of a top-up — on the real
+  2026/27 tariffs, with load shedding's unit savings modelled rather than ignored.
+* **It is legible to a councillor, not just a neighbour.** `/council` prints a per-area SLA report with
+  CSV export, so the same data that helps a household is the artefact a municipality can be handed.
 * **Real code paths, real endpoints.** Weather, air quality, geocoding, radar, Eskom status, EskomSePush, Johannesburg Water, Google News, Mastodon and OpenStreetMap Overpass all hit their production URLs.
 * **Tariff tables are real and dated** (2026/27), with the source in the response.
 * **Demo data** appears only when an upstream is unreachable — and is **badged `DEMO`** in the UI, with the source console showing `sim`.

@@ -8,7 +8,7 @@ Everything in the repository runs from this directory.
 pip install -r requirements.txt
 python demo_seed.py          # optional: a populated demo neighbourhood (clearly badged DEMO)
 uvicorn app:app --port 8000  # → http://localhost:8000   ·   /docs for OpenAPI
-pytest -q                    # from the repository root: 50 tests, no network needed
+pytest -q                    # from the repository root: 54 tests, no network needed
 ```
 
 ---
@@ -20,13 +20,16 @@ pytest -q                    # from the repository root: 50 tests, no network ne
 | **Predict** | `impact.py` | "How long do I have before water/power/routes/food are hit?" — threats with confidence + evidence |
 | **Prepare** | `impact.py` | "What must I do in the time left?" — task list sized to minutes available and to my household |
 | **Share** | `grid.py` | "Who near me can help, and who needs help?" — Ubuntu Grid, stokvels, real OSM points |
-| **Save** | `tariffs.py` | "What does this cost, and how do I cut it?" — real 2026/27 tariffs, load shifting, harvest, solar, leak detection, food basket |
+| **Save** | `tariffs.py` | "What does this cost, and how do I cut it?" — real 2026/27 tariffs, load shifting, harvest, solar, leak detection, food basket, **prepaid runway (days left, month-end shortfall, top-up planner)** |
 | **Prove** | `receipts.py` | "Will anyone fix it, and by when?" — tracked receipt with an SLA clock, plus a ward scorecard |
 | **Learn** | `insights.py` | "How likely is this, and was I right?" — Poisson forecast with exposed drivers, peer-verified outcomes, per-area calibration, published Brier score |
 | **Care** | `watch.py` | "Is she okay?" — watch circle, "I'm safe", 48 h quiet / 72 h knock escalation, pseudonyms only |
 | **Safe** | `safety.py` | "Will I get home?" — SafeWalk deadline, one-tap SOS, verified GBV/emergency helplines, unsafe-place reports that become 72 h repair receipts |
 
 Gamification lives in `resilience.py`: Resilience Score (0–100), XP and levels, Ubuntu Points, 9 badges, weekly challenges, streaks, area leaderboards.
+
+Public B2G surface: `/council` renders a printable per-area service-delivery report (SLA compliance by
+entity and by fault type) and `/api/scorecard/export?format=csv|json` hands it to a spreadsheet.
 
 Built for the network as it really is: every write is queued on the device when signal is lost and flushed
 on reconnect; the map, chat and reports degrade gracefully offline; data-saver mode switches off images,
@@ -39,10 +42,10 @@ tiles and social embeds.
 | Tab | Content |
 |---|---|
 | **Now** | Resilience ring · countdown to next impact · top three tasks · six service tiles (power, water, transport, food, flood, air) · weather + advisories · nearby reports |
-| **Prepare** | **7-day load-shedding grid with 60/15-minute heads-up alarms** · minutes-left vs minutes-needed · full task checklist · cost tools · household profile · solar & rainwater calculators |
+| **Prepare** | **prepaid runway (units → days → month end)** · **7-day load-shedding grid with 60/15-minute heads-up alarms** · minutes-left vs minutes-needed · full task checklist · cost tools · household profile · solar & rainwater calculators |
 | **Grid** | **Map** (offers, requests, faults, OSM points, businesses) · Offers · Requests · Nearby · **Business (providers + "open right now" board)** · Stokvels |
 | **Community** | **Safety (SafeWalk · SOS · helplines · report an unsafe place)** · **watch circle ("I'm safe" + who has gone quiet)** · **24-hour forecast with drivers + "was it right?" buttons** · history stats per service · merged news + social + official notices · receipts with SLA bars · ward scorecard · area chat · **Live sources console** |
-| **You** | level & XP · score breakdown · weekly challenges · badges · savings ledger · leaderboards · **accessibility controls (text size, contrast, motion)** · settings (language, theme, data-saver, push, install, WhatsApp, USSD) |
+| **You** | **read-aloud 🔊 and press-to-speak 🎤** · level & XP · score breakdown · weekly challenges · badges · savings ledger · leaderboards · **accessibility controls (text size, contrast, motion)** · settings (language, theme, data-saver, push, install, WhatsApp, USSD) |
 
 ---
 
@@ -100,7 +103,7 @@ GET  /api/ussd?session=A&input=1        feature-phone menu simulator
 ## Files
 
 ```
-app.py            FastAPI app (96 endpoints) + PWA shell routes
+app.py            FastAPI app (98 endpoints) + PWA shell routes
 net.py            tiered fetch, provenance, health registry
 sim.py            deterministic demo data + offline gazetteer
 impact.py         ★ Prepare Window

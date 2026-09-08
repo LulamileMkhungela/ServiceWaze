@@ -2,12 +2,12 @@
    - offline-first app shell (install, then run on 3G, 2G or nothing)
    - network-first API with last-known-good cache fallback
    - push notifications for the Prepare Window (before impact, not after) */
-const VERSION = "sw-v3.2.0";
+const VERSION = "sw-v3.3.0";
 const SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/static/css/app.css?v=3.2.0",
-  "/static/js/app.js?v=3.2.0",
+  "/static/css/app.css?v=3.3.0",
+  "/static/js/app.js?v=3.3.0",
   "/static/icons/icon-180.png",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",

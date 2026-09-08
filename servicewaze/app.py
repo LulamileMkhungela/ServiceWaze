@@ -29,7 +29,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -381,6 +381,15 @@ def cost_harvest(lat: float, lon: float, roof_m2: float = 60, runoff: float = 0.
     out["tier"] = w.get("tier")
     out["live"] = w.get("live")
     return out
+
+
+@app.get("/api/cost/prepaid")
+def cost_prepaid(units: float = 0.0, daily: float = 10.0, tariff: str = "",
+                 area: str = "", outage: float = 0.0, fbe: float = 0.0,
+                 topup: float = 0.0, target_days: int = 0):
+    """Prepaid runway: how many days of power are left, and will it reach month end."""
+    tid = tariff.strip() or tariffs.tariff_for_area(area)
+    return tariffs.prepaid_runway(units, daily, tid, area, outage, fbe, topup, target_days)
 
 
 @app.get("/api/cost/solar")
@@ -1225,3 +1234,51 @@ def wa_outbox(limit: int = 20):
 def ussd_menu(session: str = "", input: str = "", msisdn: str = ""):
     return {"session": session or "test",
             "text": ussd.handle(session or "test", input or "", msisdn or "")}
+
+# ---------------------------------------------------------------------------
+# Council dashboard — the B2G artefact, public and exportable
+# ---------------------------------------------------------------------------
+@app.get("/council", response_class=HTMLResponse, include_in_schema=False)
+def council_page(request: Request, area: str = ""):
+    """A printable, shareable service-delivery report for any area.
+
+    This is the artefact a ward councillor, a ward committee or a municipal
+    depot can be handed: what was reported, who owns it, how long it took and
+    how much of it breached the SLA.
+    """
+    areas = receipts.areas()
+    chosen = area.strip() or (areas[0]["area"] if areas else "Soweto")
+    from datetime import datetime, timezone, timedelta
+    return templates.TemplateResponse(request, "council.html", {
+        "request": request,
+        "area": chosen,
+        "areas": areas or [{"area": chosen, "reports": 0}],
+        "sc": receipts.scorecard(chosen),
+        "rows": receipts.list_receipts(chosen, 40),
+        "generated": datetime.now(timezone(timedelta(hours=2))).strftime("%Y-%m-%d %H:%M SAST"),
+    })
+
+
+@app.get("/api/scorecard/export")
+def scorecard_export(area: str = "", format: str = "csv"):
+    """CSV/JSON export of an area's receipts — for a spreadsheet, not a speech."""
+    import csv
+    import io
+    import json as _json
+    rows = receipts.list_receipts(area.strip(), 500)
+    if format.lower() == "json":
+        return JSONResponse({"area": area, "count": len(rows),
+                             "scorecard": receipts.scorecard(area), "receipts": rows})
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["ref", "area", "kind", "entity", "sla_hours", "elapsed_hours",
+                "state", "status", "created", "message"])
+    for r in rows:
+        w.writerow([r.get("ref"), r.get("area"), r.get("kind"), r.get("entity"),
+                    r.get("sla_hours"), round(r.get("elapsed_hours") or 0, 1),
+                    r.get("state"), r.get("status"), r.get("created"),
+                    (r.get("message") or "").replace("\n", " ")[:180]])
+    return Response(content=buf.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition":
+                             f'attachment; filename="servicewaze-{(area or "all").replace(" ", "-")}.csv"'})
+

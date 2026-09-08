@@ -482,3 +482,40 @@ def test_safety_endpoints(client):
                                                 "kind": "streetlight",
                                                 "message": "dark corner by the shop"}).json()
     assert u["ok"] is True and u["receipt"]["ref"].startswith("SW-")
+
+
+# --------------------------------------------------- prepaid runway + council
+def test_prepaid_runway_math():
+    j = tariffs.prepaid_runway(120, daily_kwh=12, tariff_id="eskom_homepower",
+                               outage_hours_per_day=0, topup_rand=100)
+    assert abs(j["daily_net_kwh"] - 12) < 0.01
+    assert abs(j["days_left"] - 10.0) < 0.2
+    assert j["cost_per_day"] > 0 and j["topup_units"] > 0
+    assert j["shortfall_units"] >= 0 and j["state"] in ("ok", "low", "critical", "short_of_month_end")
+    # load shedding saves units, so the runway gets longer
+    with_out = tariffs.prepaid_runway(120, daily_kwh=12, outage_hours_per_day=6)
+    assert with_out["days_left"] > j["days_left"]
+
+
+def test_prepaid_endpoint(client):
+    d = client.get("/api/cost/prepaid?units=50&daily=10&area=Soweto&target_days=7").json()
+    assert d["units_left"] == 50 and d["days_left"] > 0
+    assert d["units_for_target_days"] > 0 and d["rand_for_target_days"] > 0
+
+
+def test_council_dashboard_renders(client):
+    r = client.get("/council?area=Soweto")
+    assert r.status_code == 200
+    html = r.text
+    assert "Service delivery report" in html
+    assert "SLA compliance" in html and "Download CSV" in html
+
+
+def test_scorecard_csv_export(client):
+    r = client.get("/api/scorecard/export?area=Soweto")
+    assert r.status_code == 200
+    assert "text/csv" in r.headers["content-type"]
+    lines = r.text.strip().splitlines()
+    assert lines[0].startswith("ref,area,kind")
+    j = client.get("/api/scorecard/export?area=Soweto&format=json").json()
+    assert "receipts" in j and "scorecard" in j
