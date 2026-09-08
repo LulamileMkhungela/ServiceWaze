@@ -89,7 +89,8 @@ def reset():
         except Exception as e:
             print("skip", tbl, e)
     try:
-        con.execute("DELETE FROM stokvels WHERE name LIKE '%Tank%' OR name LIKE '%Staples%' OR name LIKE '%Co-op%'")
+        con.execute("DELETE FROM stokvels WHERE device LIKE 'demo-%'")
+        con.execute("DELETE FROM reports WHERE reporter LIKE 'demo%' OR reporter LIKE 'demo-%'")
     except Exception:
         pass
     con.commit()
@@ -147,7 +148,7 @@ def seed():
 
     # reports → receipts
     for area, kind, msg, hours_ago, confirms, status in REPORTS:
-        rid = sources.add_report(area, kind, msg, "demo neighbour", None, None)
+        rid = sources.add_report(area, kind, msg, "demo-neighbour", None, None)
         con = sqlite3.connect(DB)
         con.execute("UPDATE reports SET confirms=?, created=? WHERE id=?",
                     (confirms, (now - timedelta(hours=hours_ago)).isoformat(timespec="seconds"), rid))
