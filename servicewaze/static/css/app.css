@@ -327,7 +327,8 @@ label.fl { display: block; font-size: 12px; font-weight: 700; color: var(--muted
 @keyframes pop { from { transform: scale(.7); opacity: 0 } to { transform: scale(1); opacity: 1 } }
 
 @media (min-width: 720px) {
-  #app { margin: 18px auto; border-radius: 26px; overflow: hidden; min-height: calc(100vh - 36px); }
+  /* no overflow:hidden here — it would break the sticky header on desktop */
+  #app { margin: 18px auto 96px; border-radius: 26px; min-height: calc(100vh - 36px); }
   nav { bottom: 18px; border-radius: 0 0 26px 26px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

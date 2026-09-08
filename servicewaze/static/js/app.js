@@ -210,7 +210,11 @@
     if (!force && S.data[a.name]) { render(); return; }
     S.loading = true; renderNow();
     try {
-      if (force && !S.devicePulled) { S.devicePulled = true; await pullDeviceData(a); }
+      const dk = a.name + "|" + a.lat + "," + a.lon;
+      if (force && (S.deviceKey !== dk || Date.now() - (S.devicePulledAt || 0) > 600000)) {
+        S.deviceKey = dk; S.devicePulledAt = Date.now();
+        await pullDeviceData(a);
+      }
     } catch (e) {}
     try {
       const q = "/api/status?" + (a.lat != null ? `lat=${a.lat}&lon=${a.lon}&q=${encodeURIComponent(a.name)}`
