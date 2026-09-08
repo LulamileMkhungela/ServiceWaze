@@ -8,7 +8,7 @@ Everything in the repository runs from this directory.
 pip install -r requirements.txt
 python demo_seed.py          # optional: a populated demo neighbourhood (clearly badged DEMO)
 uvicorn app:app --port 8000  # → http://localhost:8000   ·   /docs for OpenAPI
-pytest -q                    # from the repository root: 34 tests, no network needed
+pytest -q                    # from the repository root: 42 tests, no network needed
 ```
 
 ---
@@ -22,8 +22,13 @@ pytest -q                    # from the repository root: 34 tests, no network ne
 | **Share** | `grid.py` | "Who near me can help, and who needs help?" — Ubuntu Grid, stokvels, real OSM points |
 | **Save** | `tariffs.py` | "What does this cost, and how do I cut it?" — real 2026/27 tariffs, load shifting, harvest, solar, leak detection, food basket |
 | **Prove** | `receipts.py` | "Will anyone fix it, and by when?" — tracked receipt with an SLA clock, plus a ward scorecard |
+| **Learn** | `insights.py` | "How likely is this, and was I right?" — Poisson forecast with exposed drivers, peer-verified outcomes, per-area calibration, published Brier score |
 
 Gamification lives in `resilience.py`: Resilience Score (0–100), XP and levels, Ubuntu Points, 9 badges, weekly challenges, streaks, area leaderboards.
+
+Built for the network as it really is: every write is queued on the device when signal is lost and flushed
+on reconnect; the map, chat and reports degrade gracefully offline; data-saver mode switches off images,
+tiles and social embeds.
 
 ---
 
@@ -32,10 +37,10 @@ Gamification lives in `resilience.py`: Resilience Score (0–100), XP and levels
 | Tab | Content |
 |---|---|
 | **Now** | Resilience ring · countdown to next impact · top three tasks · six service tiles (power, water, transport, food, flood, air) · weather + advisories · nearby reports |
-| **Prepare** | minutes-left vs minutes-needed · full task checklist · cost tools (electricity / water / food / load-shifting) · household profile · solar & rainwater calculators |
-| **Grid** | Offers · Requests · Nearby (OpenStreetMap standpipes, clinics, markets) · Stokvels |
-| **Community** | merged news + social + official notices · receipts with SLA bars · ward scorecard · area chat · **Live sources console** |
-| **You** | level & XP · score breakdown · weekly challenges · badges · savings ledger · leaderboards · settings (language, theme, data-saver, push, install, WhatsApp, USSD) |
+| **Prepare** | **7-day load-shedding grid with 60/15-minute heads-up alarms** · minutes-left vs minutes-needed · full task checklist · cost tools · household profile · solar & rainwater calculators |
+| **Grid** | **Map** (offers, requests, faults, OSM points, businesses) · Offers · Requests · Nearby · **Business (providers + "open right now" board)** · Stokvels |
+| **Community** | **24-hour forecast with drivers + "was it right?" buttons** · history stats per service · merged news + social + official notices · receipts with SLA bars · ward scorecard · area chat · **Live sources console** |
+| **You** | level & XP · score breakdown · weekly challenges · badges · savings ledger · leaderboards · **accessibility controls (text size, contrast, motion)** · settings (language, theme, data-saver, push, install, WhatsApp, USSD) |
 
 ---
 
@@ -93,7 +98,7 @@ GET  /api/ussd?session=A&input=1        feature-phone menu simulator
 ## Files
 
 ```
-app.py            FastAPI app + PWA shell routes
+app.py            FastAPI app (82 endpoints) + PWA shell routes
 net.py            tiered fetch, provenance, health registry
 sim.py            deterministic demo data + offline gazetteer
 impact.py         ★ Prepare Window

@@ -12,6 +12,7 @@ import feeds                         # noqa: E402
 import grid as grid_mod              # noqa: E402
 import i18n                          # noqa: E402
 import impact                        # noqa: E402
+import insights                      # noqa: E402
 import push                          # noqa: E402
 import receipts                      # noqa: E402
 import resilience                    # noqa: E402
@@ -32,8 +33,8 @@ def client():
 
 # ----------------------------------------------------------------- modules
 def test_module_imports():
-    for m in (app_module, auth, feeds, grid_mod, i18n, impact, push, receipts,
-              resilience, sources, tariffs, transport, ussd, whatsapp):
+    for m in (app_module, auth, feeds, grid_mod, i18n, impact, insights, push,
+              receipts, resilience, sources, tariffs, transport, ussd, whatsapp):
         assert m is not None
 
 
@@ -293,3 +294,88 @@ def test_data_is_provenance_tagged(client):
     w = d["weather"]
     assert "tier" in w and "live" in w and "source" in w
     assert w["tier"] in ("live", "device", "cache", "sim")
+
+
+# ------------------------------------------------- self-calibrating forecast
+def test_insights_forecast_is_explainable():
+    j = insights.predict("Pytestville", 24, log=False)
+    assert "forecasts" in j
+    for svc, f in j["forecasts"].items():
+        assert 0.03 <= f["prob"] <= 0.97, svc
+        assert f["band"] in ("unlikely", "possible", "likely", "very likely")
+        assert isinstance(f["drivers"], list)
+        assert "sample" in f and "calibration" in f
+
+
+def test_insights_outcome_trains_the_model():
+    insights.record_outcome("Pytestville", "water", True, "test")
+    insights.record_outcome("Pytestville", "water", False, "test")
+    acc = insights.forecast_accuracy("Pytestville")
+    assert "n" in acc and "brier" in acc
+    hist = insights.history("Pytestville")
+    assert hist["area"] == "Pytestville"
+
+
+def test_forecast_endpoints(client):
+    f = client.get("/api/insights/forecast?area=Soweto&horizon_h=12").json()
+    assert "forecasts" in f
+    h = client.get("/api/insights/history?area=Soweto").json()
+    assert "services" in h
+    r = client.post("/api/insights/outcome",
+                    json={"area": "Pytestville", "service": "power", "happened": True}).json()
+    assert r["ok"] is True
+    a = client.get("/api/insights/accuracy?area=Pytestville").json()
+    assert "n" in a
+
+
+# ------------------------------------------------- climate-smart small business
+def test_business_list_add_and_vouch():
+    grid_mod.business_add("Pytest Welding", "other", "Pytestville", "082 000 0000",
+                          "Fixes tanks and gates", None, None, "pytest-biz")
+    out = grid_mod.business_list("Pytestville")
+    names = [b["name"] for b in out["businesses"]]
+    assert "Pytest Welding" in names
+    bid = [b for b in out["businesses"] if b["name"] == "Pytest Welding"][0]["id"]
+    grid_mod.business_verify(bid, "pytest-other")
+    after = grid_mod.business_list("Pytestville")
+    row = [b for b in after["businesses"] if b["id"] == bid][0]
+    assert row["verified"] >= 1
+    assert out["checklist"]["title"]
+
+
+def test_open_board_round_trip():
+    grid_mod.post_open("Pytest Spaza", "Pytestville", "open", "Generator on", "pytest-biz")
+    board = grid_mod.open_board("Pytestville")
+    assert any(b["name"] == "Pytest Spaza" for b in board["open"])
+    assert board["ttl_hours"] == 24
+    grid_mod.post_open("Pytest Spaza", "Pytestville", "closed", "No stock", "pytest-biz")
+    board = grid_mod.open_board("Pytestville")
+    assert any(b["name"] == "Pytest Spaza" for b in board["closed"])
+
+
+def test_business_endpoints(client):
+    r = client.post("/api/business/add", json={"device": DEVICE, "name": "Pytest Solar Co",
+                                               "category": "solar", "area": "Pytestville",
+                                               "detail": "Panels and batteries"}).json()
+    assert r["ok"] is True
+    biz = client.get("/api/business?area=Pytestville").json()["businesses"]
+    assert any(b["name"] == "Pytest Solar Co" for b in biz)
+    open_r = client.get("/api/business/board?area=Pytestville").json()
+    assert "open" in open_r and "closed" in open_r
+
+
+# ------------------------------------------------------ estimated schedules
+def test_estimated_schedule_is_labelled():
+    est = sources.estimated_schedule("Soweto", 4)
+    assert est["estimated"] is True
+    assert est["stage"] == 4
+    assert len(est["upcoming"]) > 0
+    assert sources.estimated_schedule("Soweto", 0) is None
+
+
+def test_schedule_endpoint(client):
+    j = client.get("/api/electricity/schedule?q=Soweto").json()
+    assert "schedule" in j
+    sch = j["schedule"]
+    if sch is not None:
+        assert "estimated" in sch or "windows" in sch

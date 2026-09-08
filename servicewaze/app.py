@@ -39,6 +39,7 @@ import feeds
 import grid as grid_mod
 import i18n
 import impact
+import insights
 import net
 import push
 import receipts
@@ -245,10 +246,17 @@ def electricity():
 def electricity_schedule(q: str = "", lat: Optional[float] = None, lon: Optional[float] = None,
                          stage: Optional[int] = None, force: bool = False):
     sched = sources.esp_area_schedule(q.strip(), lat, lon, force=force)
-    if sched is None:
-        return {"schedule": None, "hint": "Set ESP_API_TOKEN (free, eskomsepush.org) for per-area schedules",
+    if sched is not None:
+        return {"schedule": {**sched, "upcoming": sources.next_windows(sched, stage=stage)}}
+    # No per-area feed configured: estimate from the national stage, clearly
+    # labelled, rather than showing an empty card.
+    st = sources.eskomsepush_status() or {}
+    level = stage if stage is not None else (st.get("stage") or sources.eskom_status().get("stage") or 0)
+    est = sources.estimated_schedule(q.strip() or "your area", level)
+    if est is None:
+        return {"schedule": None, "hint": "No load shedding scheduled right now. Add ESP_API_TOKEN (free, eskomsepush.org) for per-area times.",
                 "official": "https://loadshedding.eskom.co.za"}
-    return {"schedule": {**sched, "upcoming": sources.next_windows(sched, stage=stage)}}
+    return {"schedule": est}
 
 
 @app.get("/api/electricity/events")
@@ -630,6 +638,110 @@ def stokvel_contribute(sid: int, body: ContribIn, request: Request):
 def stokvel_detail(sid: int):
     return grid_mod.stokvel_detail(sid)
 
+
+
+
+# ---------------------------------------------------------------------------
+# Area insights & the self-calibrating forecast
+# ---------------------------------------------------------------------------
+@app.get("/api/insights/history")
+def insights_history(area: str = "", days: int = 120):
+    """Service-delivery record for an area — the B2G artefact."""
+    return insights.history(area or "Soweto", days)
+
+
+@app.get("/api/insights/forecast")
+def insights_forecast(area: str = "", horizon_h: int = 24, log: bool = True):
+    """Probability that water / power / transport fail in this area within the
+    horizon, with drivers, sample size and the model's own calibration."""
+    place = _resolve_place(area)
+    w = sources.weather(place["lat"], place["lon"]) if place["lat"] is not None else None
+    notices = [i for i in feeds.get_feed(categories=["water"], limit=10) if i.get("official")]
+    return insights.predict(area or place["name"], horizon_h, weather=w,
+                            official_notices=notices, log=log)
+
+
+class OutcomeIn(BaseModel):
+    area: str
+    service: str
+    happened: bool
+    note: str = ""
+
+
+@app.post("/api/insights/outcome")
+def insights_outcome(body: OutcomeIn):
+    """The street tells us whether the forecast was right. The model learns."""
+    return insights.record_outcome(body.area, body.service, body.happened, body.note)
+
+
+@app.get("/api/insights/accuracy")
+def insights_accuracy(area: str = ""):
+    return insights.forecast_accuracy(area)
+
+
+# ---------------------------------------------------------------------------
+# Climate-smart small business: providers + the "who's open" board
+# ---------------------------------------------------------------------------
+@app.get("/api/business")
+def business_api(area: str = "", category: str = ""):
+    return grid_mod.business_list(area, category)
+
+
+class BusinessIn(BaseModel):
+    device: str = ""
+    name: str
+    category: str = "other"
+    area: str = ""
+    contact: str = ""
+    detail: str = ""
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+
+
+@app.post("/api/business/add")
+def business_add(body: BusinessIn, request: Request):
+    if len(body.name.strip()) < 3:
+        raise HTTPException(400, "name too short")
+    _throttle(request, "business", 20)
+    out = grid_mod.business_add(body.name.strip(), body.category, body.area.strip(),
+                                body.contact.strip(), body.detail.strip(),
+                                body.lat, body.lon, _device(request, body.device))
+    resilience.act(_device(request, body.device), "shared_resource",
+                   meta="business:" + body.name[:40], area=body.area)
+    return out
+
+
+class VerifyIn(BaseModel):
+    device: str = ""
+    id: int
+
+
+@app.post("/api/business/verify")
+def business_verify(body: VerifyIn, request: Request):
+    return grid_mod.business_verify(body.id, _device(request, body.device))
+
+
+@app.get("/api/business/board")
+def business_board(area: str = ""):
+    return grid_mod.open_board(area)
+
+
+class OpenIn(BaseModel):
+    device: str = ""
+    name: str
+    area: str = ""
+    status: str = "open"
+    note: str = ""
+
+
+@app.post("/api/business/open")
+def business_open(body: OpenIn, request: Request):
+    if len(body.name.strip()) < 2:
+        raise HTTPException(400, "name too short")
+    _throttle(request, "openboard", 30)
+    grid_mod.post_open(body.name.strip(), body.area.strip(), body.status,
+                       body.note.strip(), _device(request, body.device))
+    return {"ok": True}
 
 # ---------------------------------------------------------------------------
 # Reports → receipts → scorecard

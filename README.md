@@ -35,8 +35,8 @@ The information exists. It is spread across a utility website, a WhatsApp line, 
 ## 2. What it does — the five loops
 
 ```
-  PREDICT  →  PREPARE  →  SHARE  →  SAVE  →  PROVE
-  "in 3h"     "do now"    "I have"   "R saved"  "receipt #"
+  PREDICT  →  PREPARE  →  SHARE  →  SAVE  →  PROVE  →  LEARN
+  "in 3h"     "do now"    "I have"   "R saved"  "receipt #"  "was it right?"
 ```
 
 ### PREDICT — the Prepare Window (`impact.py`)
@@ -73,6 +73,41 @@ SLA 24 h · Elapsed 31 h 12 min · OVERDUE
 ```
 
 Receipts aggregate into a **ward scorecard**: open / fixed / overdue / average hours / SLA compliance by entity and by fault type. That is the artefact a municipality can be handed, and the reason this becomes a B2G product rather than another complaint box.
+
+### LEARN — the forecast that gets better every time it is wrong (`insights.py`)
+
+Status apps tell you the schedule. ServiceWaze tells you the **probability**, shows you **why**, and then
+**asks the street whether it was right** — and retrains on the answer.
+
+```
+Water · 29% in the next 24 h · sample 3 events · calibration 6 verified, Brier 0.18
+  ↑ 3 neighbours report no/low water now
+  ↑ median gap between water events here: 2 days
+  ↑ heavy rain (28 mm) forecast in 24 h
+[ Yes, it happened ]   [ Nothing happened ]
+```
+
+* Poisson baseline `p = 1 − exp(−λ·h)`, λ learned per area × service from the event history
+* driver boosts stack **with their weights exposed** — nothing is a black box
+* outcomes are recorded by **two non-admin neighbours** (the same anti-gaming rule as receipts), then
+  folded into a per-area calibration factor
+* accuracy is published as a **Brier score** and shown to the user — the model's honesty is a feature
+
+This is the answer to the question the judges actually ask: *"Can the app think for itself, forecast, and
+predict likely future behaviour from patterns in data?"*
+
+---
+
+## 2b. Depth beyond the brief
+
+| Capability | Where | Why it matters |
+|---|---|---|
+| **Live resilience map** (`grid.py` + Leaflet) | Grid → Map | "Waze for services" without a map is not Waze. Offers, requests, faults, standpipes, clinics and businesses on one map, degrading to a list offline or on data-saver. |
+| **Climate-smart small business mode** (`grid.py`) | Grid → Business | The township economy *is* the resilience infrastructure. Providers are listed and peer-vouched; the **"Open right now" board** (24 h TTL) tells neighbours which spaza is running on a generator — footfall for the business, food access for the street. |
+| **7-day schedule grid + heads-up alarms** | Prepare | 60-minute and 15-minute warnings **before** the lights go, with the 7-day window grid. Without a per-area feed it falls back to an explicitly-labelled estimate derived from the national stage. |
+| **Offline report queue** (`static/js/app.js`) | everywhere | Reports, offers and chat are queued on the device when signal dies and flushed automatically on reconnect — the network fails exactly when you need to report. |
+| **Accessibility controls** | You → Make it easier to use | Text size A/A+/A++, high contrast, reduced motion, 44 px targets, focus rings, screen-reader labels — adjustable **inside** the app, not buried in OS settings. |
+| **Interactive onboarding** | first run | Three *do it now* steps (add your street → tick a prep task → offer something) that earn XP, instead of three slides nobody reads. |
 
 ---
 
@@ -191,7 +226,7 @@ ServiceWaze/
 │   └── ARCHITECTURE.md           request flow, data tiering, design decisions
 ├── concepts/servicewaze-concept.md   original product thesis (2026)
 └── servicewaze/
-    ├── app.py                FastAPI app (73 endpoints) + PWA shell
+    ├── app.py                FastAPI app (82 endpoints) + PWA shell
     ├── net.py                tiered live-data layer + provenance + health registry
     ├── sim.py                deterministic demo data for offline operation
     ├── impact.py             ★ Prepare Window: threats, confidence, task plan

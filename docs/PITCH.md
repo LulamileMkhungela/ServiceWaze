@@ -97,7 +97,7 @@
 | **Innovation** | Prepare Window (countdown *to* impact), provenance-tagged data, Ubuntu Grid, stokvels, real-tariff money engine |
 | **Problem solved / impact** | Water, power, transport, food, money — five of the six focus areas, end to end, with measurable rand saved |
 | **Usability / UI** | 5-tab thumb-first PWA, one-screen answer, zero setup, offline, data-saver, read-aloud, dark/light |
-| **Technical execution** | FastAPI + 73 endpoints, sqlite, tiered async fetch with caching and graceful degradation, service worker, Web Push, 34 automated tests, headless JS smoke test |
+| **Technical execution** | FastAPI + 82 endpoints, sqlite, tiered async fetch with caching and graceful degradation, service worker, Web Push, 42 automated tests, headless JS smoke test |
 | **Local relevance** | SA tariffs, SA municipalities, SA languages, SA food-basket data, SA transport operators |
 | **Scalability / sustainability** | B2G comms contracts, B2B API, business freemium, group-buy margin |
 | **Accessibility / inclusion** | USSD, WhatsApp, offline, low-data, 5 languages, no login, no tracking, POPIA design |

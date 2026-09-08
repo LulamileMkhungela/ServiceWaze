@@ -30,9 +30,23 @@ class El {
     this.files = [];
     this.selectedOptions = [{ dataset: {} }];
     this._html = "";
+    this._src = "";
   }
+  set src(v) {
+    this._src = String(v);
+    // no network in CI: simulate a blocked CDN asset
+    if (/^https?:/.test(this._src)) setTimeout(() => { if (this._onerror) this._onerror(new Error("blocked")); }, 5);
+  }
+  get src() { return this._src; }
+  set onerror(f) { this._onerror = f; }
+  get onerror() { return this._onerror; }
+  set onload(f) { this._onload = f; }
+  get onload() { return this._onload; }
   set innerHTML(v) { this._html = String(v); }
   get innerHTML() { return this._html; }
+  // the real DOM escapes through a temp element; the stub keeps text visible
+  set textContent(v) { this._html = String(v); }
+  get textContent() { return this._html; }
   set className(v) { this._cls = v; }
   get className() { return this._cls || ""; }
   set onclick(f) { this._onclick = f; }
@@ -58,10 +72,31 @@ function el(sel) {
 }
 
 const NAV = ["now", "prepare", "grid", "community", "you"].map((t) => { const e = new El('#nav button'); e.dataset.tab = t; return e; });
+// Pull [data-x="y"] stubs out of rendered HTML so handlers get wired and the
+// smoke test can click segment / outcome / vouch buttons for real.
+function collect(sel) {
+  const m = /^\[data-([a-zA-Z0-9_-]+)\]$/.exec(sel);
+  if (!m) return [];
+  const attr = m[1];
+  const out = [];
+  for (const node of registry.values()) {
+    const re = new RegExp("data-" + attr + '="([^"]*)"', "g");
+    let hit;
+    while ((hit = re.exec(node.innerHTML || "")) !== null) {
+      const e = new El(sel);
+      e.dataset[attr] = hit[1];
+      out.push(e);
+      if (out.length > 40) return out;
+    }
+  }
+  return out;
+}
+
 const document = {
   documentElement: new El("html"),
+  head: new El("head"),
   querySelector: (s) => el(s),
-  querySelectorAll: (s) => (s === "#nav button" ? NAV : []),
+  querySelectorAll: (s) => (s === "#nav button" ? NAV : collect(s)),
   getElementById: (s) => el("#" + s),
   createElement: () => new El("div"),
   addEventListener: (name, fn) => { if (name === "DOMContentLoaded") document._ready = fn; },
@@ -158,7 +193,21 @@ const code = fs.readFileSync(path.join(ROOT, "static", "js", "app.js"), "utf8");
     }
   } catch (e) { errors.push(e); }
 
-  await new Promise((r) => setTimeout(r, 3500));
+  // exercise the new v3.1 surfaces: grid segments, forecast, schedule, a11y
+  await new Promise((r) => setTimeout(r, 1200));
+  const segs = document.querySelectorAll("[data-seg]");
+  for (const want of ["business", "map", "offers", "needs", "nearby", "stokvel"]) {
+    const b = segs.find((s2) => s2.dataset.seg === want);
+    if (b && b._onclick) { try { b._onclick(); } catch (e) { errors.push(e); } }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  for (const sel of ["[data-out]", "[data-verify]", "[data-text]", "[data-contrast]", "[data-motion]", "[data-bc]"]) {
+    const btns = document.querySelectorAll(sel);
+    if (btns[0] && btns[0]._onclick) { try { btns[0]._onclick(); } catch (e) { errors.push(e); } }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
+  await new Promise((r) => setTimeout(r, 2500));
   for (const [tab, id] of Object.entries(tabs)) {
     const html = el("#" + id).innerHTML;
     console.log(`${tab.padEnd(10)} rendered ${String(html.length).padStart(6)} chars`);
@@ -168,11 +217,17 @@ const code = fs.readFileSync(path.join(ROOT, "static", "js", "app.js"), "utf8");
   if (process.env.DUMP) {
     for (const id of ["sec-now", "sec-prepare", "sec-grid", "sec-community", "sec-you"])
       fs.writeFileSync(`/tmp/${id}.html`, el("#" + id).innerHTML);
-    for (const id of ["gridBody", "costBox", "feedBox", "recBox", "srcBox", "chatBox", "profBox", "energyBox"]) {
+    for (const id of ["gridBody", "costBox", "feedBox", "recBox", "srcBox", "chatBox", "profBox", "energyBox",
+                      "insightBox", "schedBox", "mapList", "mapNote"]) {
       const h = el("#" + id).innerHTML;
       console.log(`  #${id.padEnd(10)} ${String(h.length).padStart(6)} chars`);
       fs.writeFileSync(`/tmp/${id}.html`, h);
     }
+  }
+
+  for (const id of ["insightBox", "schedBox"]) {
+    const h = el("#" + id).innerHTML;
+    if (h.length < 20) { console.log(`  FAIL: #${id} rendered nothing`); process.exit(1); }
   }
 
   if (errors.length) {

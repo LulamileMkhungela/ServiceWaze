@@ -26,9 +26,11 @@
     receipts: [], scorecard: null, chat: [], health: null,
     you: null, strings: {}, lang: localStorage.getItem(LS.lang) || "en",
     theme: localStorage.getItem(LS.theme) || "dark",
-    settings: Object.assign({ dataSaver: false, notify: false, readAloud: true },
+    settings: Object.assign({ dataSaver: false, notify: false, readAloud: true,
+      heads60: true, heads15: true, textSize: "normal", contrast: "normal" },
       JSON.parse(localStorage.getItem(LS.set) || "{}")),
     done: JSON.parse(localStorage.getItem(LS.done) || "{}"),
+    queue: [], gridTab: "map", forecast: null, scheduleCache: null,
     loading: false,
   };
 
@@ -232,6 +234,8 @@
     try { S.grid.offers = (await api(`/api/grid?area=${encodeURIComponent(area)}&limit=30`)).offers || []; } catch (e) {}
     try { S.grid.needs = (await api(`/api/grid?area=${encodeURIComponent(area)}&limit=30`)).needs || []; } catch (e) {}
     try { S.grid.stokvels = (await api(`/api/stokvels?area=${encodeURIComponent(area)}`)).stokvels || []; } catch (e) {}
+    try { if (a && a.lat != null) S.grid.points = (await api(`/api/grid/points?lat=${a.lat}&lon=${a.lon}`)).points || {}; } catch (e) {}
+    try { S.grid.businesses = (await api(`/api/business?area=${encodeURIComponent(area)}`)).businesses || []; } catch (e) {}
     try { S.receipts = (await api(`/api/receipts?area=${encodeURIComponent(area)}&limit=15`)).receipts || []; } catch (e) {}
     try { S.scorecard = await api(`/api/scorecard?area=${encodeURIComponent(area)}`); } catch (e) {}
     try { S.chat = (await api(`/api/chat?q=${encodeURIComponent(area)}`)).messages || []; } catch (e) {}
@@ -459,6 +463,11 @@
       </div>
 
       <div class="card tight">
+        <h2>⚡ ${esc("Load-shedding windows")}</h2>
+        <div id="schedBox"><div class="skeleton"></div></div>
+      </div>
+
+      <div class="card tight">
         <h2>🏠 ${esc(t("household", "Household"))}</h2>
         <div id="profBox"><div class="skeleton"></div></div>
       </div>
@@ -478,6 +487,7 @@
     });
     loadCost("elec");
     loadProfile();
+    renderSchedule();
     $("#solarBtn").onclick = loadSolar;
     $("#harvestBtn2").onclick = openHarvest;
   }
@@ -576,7 +586,7 @@
   async function renderGrid(sub) {
     const el = $("#sec-grid");
     const a = activeArea();
-    const cur = sub || S.gridTab || "offers";
+    const cur = sub || S.gridTab || "map";
     S.gridTab = cur;
     const seg = (id, lb) => `<button class="${cur === id ? "on" : ""}" data-g="${id}">${esc(lb)}</button>`;
     el.innerHTML = `
@@ -588,13 +598,15 @@
         </div>
         <div class="tiny mt8">${esc("Share water, power, a fridge shelf, a seat or a skill. Everything is time-boxed and neighbour-verified.")}</div>
       </div>
-      <div class="seg mb8">${seg("offers", "🙌 Offers")}${seg("needs", "🆘 Requests")}${seg("nearby", "📍 Nearby")}${seg("stokvel", "🐷 " + t("stokvel", "Stokvel"))}</div>
+      <div class="seg mb8">${seg("map", "🗺️ Map")}${seg("offers", "🙌 Offers")}${seg("needs", "🆘 Requests")}${seg("nearby", "📍 Points")}${seg("business", "🏪 Business")}${seg("stokvel", "🐷 " + t("stokvel", "Stokvel"))}</div>
       <div id="gridBody"><div class="skeleton" style="height:120px"></div></div>`;
     $("#offerBtn").onclick = () => openGridForm("offer");
     $("#needBtn").onclick = () => openGridForm("need");
     $$("[data-g]").forEach(b => b.onclick = () => renderGrid(b.dataset.g));
     const body = $("#gridBody");
     try {
+      if (cur === "map") { return renderMap(); }
+      if (cur === "business") { return renderBusiness(); }
       if (cur === "nearby") {
         if (!a || a.lat == null) { body.innerHTML = `<div class="card"><div class="empty">Pick an area with a location.</div></div>`; return; }
         body.innerHTML = `<div class="card"><div class="skeleton"></div></div>`;
@@ -750,6 +762,11 @@
         <div id="recBox"></div>
       </div>
       <div class="card tight">
+        <h2>🔮 ${esc("24-hour forecast")} <span class="spacer"></span>
+          <span class="badge">${esc("self-learning")}</span></h2>
+        <div id="insightBox"><div class="skeleton"></div></div>
+      </div>
+      <div class="card tight">
         <h2>💬 ${esc(t("chat", "Chat"))} · ${esc(a ? a.name.split(",")[0] : "")}</h2>
         <div id="chatBox" style="max-height:240px;overflow:auto"></div>
         <div class="row mt8"><input id="chatIn" placeholder="${esc("Say something helpful…")}">
@@ -763,7 +780,7 @@
     $$("#feedSeg button").forEach(b => b.onclick = () => { S.feedFilter = b.dataset.f; renderCommunity(); });
     $("#authLink").onclick = (e) => { e.preventDefault(); openAuth(); };
     $("#chatSend").onclick = sendChat;
-    renderFeed(); renderReceipts(); renderChat(); renderSources();
+    renderFeed(); renderReceipts(); renderChat(); renderSources(); renderInsights();
   }
 
   function renderFeed() {
@@ -953,7 +970,8 @@
           <button class="btn sm ghost" id="ussdBtn">📟 USSD</button>
         </div>
         <div class="tiny mt8">${esc("ServiceWaze v3 · no login, no tracking, POPIA-friendly. Data shown with its source.")}</div>
-      </div>`;
+      </div>
+      ${a11yControls()}`;
 
     $$("[data-goto]").forEach(b => b.onclick = () => go(b.dataset.goto));
     $$("[data-ch]").forEach(b => b.onclick = async () => {
@@ -981,6 +999,7 @@
       const j = await api("/api/ussd?session=web&input=");
       alert(j.text + "\n\n(Feature-phone channel: the same logic runs on *134*xxxx#)");
     };
+    wireA11y();
   }
 
   function saveSettings() { localStorage.setItem(LS.set, JSON.stringify(S.settings)); }
@@ -1163,7 +1182,11 @@
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
-    window.addEventListener("online", () => { renderHeader(); loadArea(true); });
+    loadQueue();
+    applyA11y();
+    window.addEventListener("online", () => {
+      renderHeader(); flushQueue(); loadArea(true);
+    });
     window.addEventListener("offline", renderHeader);
 
     if (!S.areas.length) {
@@ -1175,6 +1198,514 @@
     loadExtras();
     setTimeout(showIntro, 900);
     setInterval(() => { const a = activeArea(); if (a) { S.data[a.name] = null; loadArea(true); } }, 5 * 60 * 1000);
+  }
+
+
+  /* ==================================================================== MAP
+     "Waze for services" without a map is not Waze. Leaflet is lazy-loaded
+     from a CDN and the tab degrades to a list when tiles are unavailable
+     (offline, data-saver, blocked network) — everything else still works. */
+  let _leaflet = null;
+  function loadLeaflet() {
+    if (_leaflet) return _leaflet;
+    _leaflet = new Promise((res, rej) => {
+      if (window.L) return res(window.L);
+      const css = document.createElement("link");
+      css.rel = "stylesheet";
+      css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(css);
+      const sc = document.createElement("script");
+      sc.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+      sc.onload = () => res(window.L);
+      sc.onerror = rej;
+      document.head.appendChild(sc);
+    });
+    return _leaflet;
+  }
+
+  function mapPins(a) {
+    const pins = [];
+    (S.grid.offers || []).forEach((o) => pins.push({ lat: o.lat, lon: o.lon, icon: "🙌",
+      title: o.title, sub: o.availability ? o.availability : "offered", kind: "offer" }));
+    (S.grid.needs || []).forEach((o) => pins.push({ lat: o.lat, lon: o.lon, icon: "🆘",
+      title: o.title, sub: "needed", kind: "need" }));
+    Object.values(S.grid.points || {}).forEach((arr) => arr.forEach((p) =>
+      pins.push({ lat: p.lat, lon: p.lon, icon: p.kind === "water" ? "🚰" : p.kind === "food" ? "🥫" : "🏥",
+        title: p.name, sub: p.distance_m + " m", kind: "point" })));
+    (S.grid.businesses || []).forEach((b) => pins.push({ lat: b.lat, lon: b.lon, icon: b.icon || "🏪",
+      title: b.name, sub: b.contact || b.area || "", kind: "business" }));
+    (S.receipts || []).slice(0, 12).forEach((r) => pins.push({ lat: r.lat, lon: r.lon, icon: "🧾",
+      title: r.kind.replace(/_/g, " ") + " · " + r.area, sub: r.state, kind: "receipt" }));
+    return pins.filter((p) => p.lat != null && p.lon != null);
+  }
+
+  function renderMapList(a) {
+    const box = $("#mapList"); if (!box) return;
+    const pins = mapPins(a).slice(0, 20);
+    box.innerHTML = pins.length ? pins.map((p) => `<div class="prow">
+      <div class="pdot">${p.icon}</div>
+      <div style="flex:1"><div class="t">${esc(p.title)}</div><div class="tiny">${esc(p.sub || "")}</div></div>
+      <a class="btn sm ghost" target="_blank" rel="noopener"
+         href="https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=18/${p.lat}/${p.lon}">Map</a>
+    </div>`).join("") : `<div class="empty" style="padding:14px"><span class="e">📍</span>${esc("Nothing with a location yet — add your street to the Grid.")}</div>`;
+  }
+
+  async function renderMap() {
+    const host = $("#gridBody");
+    const a = activeArea();
+    host.innerHTML = `<div class="card tight">
+      <h2>🗺️ ${esc(a ? a.name : "Live map")}</h2>
+      <div id="mapdiv" style="height:320px;border-radius:14px;overflow:hidden;background:var(--card2);border:1px solid var(--line)"></div>
+      <div class="tiny mt8" id="mapNote">${esc("Red = reported fault · 🙌 offer · 🆘 request · 🚰 water point · 🏪 business")}</div></div>
+      <div class="card tight"><h2>📍 ${esc("On your street")}</h2><div id="mapList"><div class="skeleton"></div></div></div>`;
+    if (!a || a.lat == null) {
+      $("#mapNote").textContent = "Add an area with a location to see the map.";
+      $("#mapList").innerHTML = `<div class="empty" style="padding:12px">No location.</div>`;
+      return;
+    }
+    if (S.settings.dataSaver) {
+      $("#mapNote").textContent = "Data saver is on — the map is switched off to save your data.";
+      return renderMapList(a);
+    }
+    let L = null;
+    try { L = await loadLeaflet(); } catch (e) { L = null; }
+    if (!L) {
+      $("#mapNote").textContent = "Map tiles are unavailable right now (offline or blocked). Everything below still works.";
+      return renderMapList(a);
+    }
+    try {
+      const map = L.map("mapdiv", { zoomControl: false, attributionControl: false }).setView([a.lat, a.lon], 13);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
+      L.control.zoom({ position: "bottomright" }).addTo(map);
+      const divIcon = (emoji) => L.divIcon({
+        html: `<div style="font-size:17px;background:var(--card);border:1px solid var(--line);
+                 border-radius:10px;width:30px;height:30px;display:grid;place-items:center;
+                 box-shadow:0 2px 8px rgba(0,0,0,.3)">${emoji}</div>`,
+        className: "", iconSize: [30, 30], iconAnchor: [15, 15],
+      });
+      const pins = mapPins(a);
+      pins.forEach((p) => {
+        L.marker([p.lat, p.lon], { icon: divIcon(p.icon) })
+          .addTo(map)
+          .bindPopup(`<b>${esc(p.title)}</b><br>${esc(p.sub || "")}`);
+      });
+      if (pins.length) {
+        const b = L.latLngBounds(pins.map((p) => [p.lat, p.lon]));
+        b.extend([a.lat, a.lon]);
+        map.fitBounds(b.pad(0.25));
+      }
+      $("#mapNote").textContent = `${pins.length} places on the map around ${a.name}.`;
+    } catch (e) {
+      $("#mapNote").textContent = "Map failed to load — list below still works.";
+    }
+    renderMapList(a);
+  }
+
+  /* =============================================================== BUSINESS
+     Climate-smart small business: the trades that keep a township running,
+     plus the "we're open on the generator" board — which is food access for
+     residents and footfall for the business, in one tap. */
+  async function renderBusiness() {
+    const host = $("#gridBody");
+    const a = activeArea();
+    const area = a ? a.name.split(",")[0] : "";
+    host.innerHTML = `<div class="card"><div class="skeleton"></div></div>`;
+    try {
+      const [board, biz] = await Promise.all([
+        api(`/api/business/board?area=${encodeURIComponent(area)}`),
+        api(`/api/business?area=${encodeURIComponent(area)}`),
+      ]);
+      S.grid.businesses = biz.businesses || [];
+      const openNow = board.open || [], closed = board.closed || [];
+      host.innerHTML = `
+        <div class="card tight">
+          <h2>🏪 ${esc("Open right now")} <span class="spacer"></span>
+            <span class="badge">${openNow.length} open</span></h2>
+          <div class="grid2 mb8">
+            <button class="btn primary sm" id="postOpen">✅ ${esc("We're open")}</button>
+            <button class="btn sm ghost" id="postClosed">⛔ ${esc("Had to close")}</button>
+          </div>
+          ${openNow.length ? openNow.map((b) => `<div class="item">
+            <div class="between"><span class="t">🟢 ${esc(b.name)}</span><span class="tiny">${timeAgo(b.created)}</span></div>
+            <div class="b">${esc(b.note || "")}</div></div>`).join("")
+          : `<div class="empty" style="padding:12px">${esc("Nobody has posted yet. Spaza with a generator? Tell the street.")}</div>`}
+          ${closed.length ? `<div class="mt8">${closed.map((b) => `<div class="item">
+            <div class="between"><span class="t">⛔ ${esc(b.name)}</span><span class="tiny">${timeAgo(b.created)}</span></div>
+            <div class="b">${esc(b.note || "")}</div></div>`).join("")}</div>` : ""}
+          <div class="tiny mt8">${esc("Posts expire after " + (board.ttl_hours || 24) + " hours so the board never lies.")}</div>
+        </div>
+
+        <div class="card tight">
+          <h2>🧰 ${esc("Resilience providers")} <span class="spacer"></span>
+            <button class="btn sm ghost" id="addBiz">＋ ${esc(t("add", "Add"))}</button></h2>
+          ${(biz.businesses || []).length ? biz.businesses.map((b) => `<div class="item">
+            <div class="between"><span class="t">${b.icon} ${esc(b.name)}
+              ${b.verified ? `<span class="badge official">${b.verified} ✓ verified</span>` : ""}</span>
+              <button class="btn sm ghost" data-verify="${b.id}">👍 ${esc("Vouch")}</button></div>
+            <div class="b">${esc(b.detail || "")}</div>
+            <div class="tiny mt8">${esc(b.area || "")} ${b.contact ? "· " + esc(b.contact) : ""}</div>
+          </div>`).join("")
+          : `<div class="empty" style="padding:12px"><span class="e">🧰</span>${esc("No providers listed yet. Add the plumber who actually shows up.")}</div>`}
+        </div>
+
+        <div class="card tight">
+          <h2>📋 ${esc("Business continuity")}</h2>
+          ${(biz.checklist && biz.checklist.steps || []).map((st, i) => `<div class="task">
+            <div class="tick" data-bc="${i}">✓</div>
+            <div style="flex:1"><div class="tt">${i + 1}. ${esc(st)}</div></div></div>`).join("")}
+        </div>`;
+      $("#postOpen").onclick = () => postOpenStatus("open");
+      $("#postClosed").onclick = () => postOpenStatus("closed");
+      $("#addBiz").onclick = openBusinessForm;
+      $$("[data-verify]").forEach((b) => b.onclick = async () => {
+        const r = await post("/api/business/verify", { device: S.device, id: +b.dataset.verify });
+        toast("Vouched — " + r.verified + " neighbours trust this business 🤝");
+        renderBusiness();
+      });
+      $$("[data-bc]").forEach((b) => b.onclick = () => {
+        b.classList.toggle("on");
+        if (b.classList.contains("on")) {
+          post("/api/me/action", { device: S.device, action: "drill", meta: "business-continuity" });
+          toast("+45 XP — continuity step done");
+        }
+      });
+    } catch (e) {
+      host.innerHTML = `<div class="card"><div class="empty">Could not load the business board.</div></div>`;
+    }
+  }
+
+  function postOpenStatus(status) {
+    const sheet = $("#sheet");
+    sheet.innerHTML = `<div class="grab"></div>
+      <h3>${status === "open" ? "✅ We're open" : "⛔ Had to close"}</h3>
+      <p class="muted" style="margin:0 0 8px">${esc(status === "open"
+        ? "Tell neighbours you're trading — generator, gas, stock, hours."
+        : "Let customers know why, so they don't walk.")}</p>
+      <label class="fl">Business name</label><input id="obName" placeholder="e.g. Mama's Spaza" maxlength="60">
+      <label class="fl">Note</label><input id="obNote" placeholder="${status === "open" ? "e.g. generator on until 21:00, cold drinks" : "e.g. no water for cooking, back tomorrow"}" maxlength="120">
+      <div class="grid2 mt12"><button class="btn ghost" id="obCancel">${esc(t("cancel", "Cancel"))}</button>
+      <button class="btn primary" id="obSend">${esc(t("send", "Post"))}</button></div>`;
+    $("#overlay").classList.add("on");
+    $("#obCancel").onclick = closeSheet;
+    $("#obSend").onclick = async () => {
+      const name = $("#obName").value.trim();
+      if (name.length < 2) return toast("Add the business name");
+      const a = activeArea();
+      await post("/api/business/open", { device: S.device, name, status,
+        note: $("#obNote").value.trim(), area: a ? a.name.split(",")[0] : "" });
+      toast(status === "open" ? "Posted — customers can find you 🏪" : "Posted — thanks for telling the street");
+      closeSheet(); renderBusiness();
+    };
+  }
+
+  function openBusinessForm() {
+    const sheet = $("#sheet");
+    const cats = { water: "🛢️ Water: tanks, boreholes, delivery", solar: "☀️ Solar & batteries",
+      gas: "🔥 Gas & stoves", plumbing: "🔧 Plumbing & leaks", electrical: "⚡ Electrical",
+      food: "🥫 Food", cold: "🧊 Cold storage & ice", transport: "🚐 Transport & delivery", other: "🏪 Other" };
+    sheet.innerHTML = `<div class="grab"></div><h3>🧰 ${esc("Add a resilience provider")}</h3>
+      <p class="muted" style="margin:0 0 8px">${esc("The trades and shops that keep your street running during a disruption.")}</p>
+      <label class="fl">Name</label><input id="bzName" placeholder="e.g. Sipho's Plumbing" maxlength="60">
+      <label class="fl">Category</label><select id="bzCat">
+        ${Object.entries(cats).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
+      <label class="fl">Contact (phone or WhatsApp)</label><input id="bzContact" placeholder="082 000 0000">
+      <label class="fl">What do they do?</label><textarea id="bzDetail" rows="2" placeholder="e.g. fixes burst pipes, 24h, Soweto only"></textarea>
+      <div class="grid2 mt12"><button class="btn ghost" id="bzCancel">${esc(t("cancel", "Cancel"))}</button>
+      <button class="btn primary" id="bzSend">${esc(t("add", "Add"))}</button></div>`;
+    $("#overlay").classList.add("on");
+    $("#bzCancel").onclick = closeSheet;
+    $("#bzSend").onclick = async () => {
+      const name = $("#bzName").value.trim();
+      if (name.length < 3) return toast("Add a name");
+      const a = activeArea();
+      await post("/api/business/add", { device: S.device, name, category: $("#bzCat").value,
+        area: a ? a.name.split(",")[0] : "", contact: $("#bzContact").value.trim(),
+        detail: $("#bzDetail").value.trim(), lat: a ? a.lat : null, lon: a ? a.lon : null });
+      toast("Listed — neighbours can vouch for them");
+      closeSheet(); renderBusiness();
+    };
+  }
+
+  /* ============================================================== FORECAST
+     The model shows its work: probability, the drivers behind it, how many
+     events it learned from, and how accurate it has been here before. Then it
+     asks the street whether it was right — that answer trains it. */
+  async function renderInsights() {
+    const box = $("#insightBox"); if (!box) return;
+    const a = activeArea(); if (!a) return;
+    const area = a.name.split(",")[0];
+    box.innerHTML = `<div class="skeleton"></div>`;
+    try {
+      const [fc, hist] = await Promise.all([
+        api(`/api/insights/forecast?area=${encodeURIComponent(area)}&horizon_h=24`),
+        api(`/api/insights/history?area=${encodeURIComponent(area)}`),
+      ]);
+      S.forecast = fc;
+      const rows = Object.values(fc.forecasts || {});
+      box.innerHTML = `
+        <div class="tiny mb8">${esc("Next 24 hours — modelled from " + (hist.total_events || 0) +
+          " events in this area over " + (hist.window_days || 120) + " days.")}</div>
+        ${rows.map((f) => {
+          const pct = Math.round(f.prob * 100);
+          const cls = f.prob >= 0.6 ? "b-bad" : f.prob >= 0.3 ? "b-warn" : "b-ok";
+          return `<div class="mb8">
+            <div class="between"><span class="t">${f.icon} ${esc(f.label)}</span>
+              <span class="num"><b>${pct}%</b> · ${esc(f.band)}</span></div>
+            <div class="bar2"><i class="${cls}" style="width:${pct}%"></i></div>
+            <div class="tiny">${esc((f.drivers || []).map((d) => d.label).join(" · ") || "no signal yet")}</div>
+            <div class="tiny">${esc("sample " + f.sample + " · calibration " + (f.calibration && f.calibration.n >= 3
+              ? f.calibration.n + " verified, Brier " + f.calibration.brier : "not yet calibrated"))}</div>
+            <div class="grid2 mt8">
+              <button class="btn sm ghost" data-out="1" data-svc="${f.service}">${esc("Yes, it happened")}</button>
+              <button class="btn sm ghost" data-out="0" data-svc="${f.service}">${esc("Nothing happened")}</button>
+            </div>
+          </div>`;
+        }).join("")}
+        <div class="mt8">${Object.values(hist.services || {}).map((sv) => `<div class="kv">
+          <span>${sv.icon} ${esc(sv.label)}</span>
+          <b>${sv.events} events${sv.median_hours_to_fix != null ? " · " + Math.round(sv.median_hours_to_fix) + "h to fix" : ""}</b></div>`).join("")}</div>
+        <div class="tiny mt8">${esc("Every answer above trains the model for your street. That is the part nobody else has.")}</div>`;
+      $$("[data-out]").forEach((b) => b.onclick = async () => {
+        const r = await post("/api/insights/outcome", {
+          area, service: b.dataset.svc, happened: b.dataset.out === "1" });
+        toast(r.matched ? "Logged — the model just learned something 🙏" : "Logged for the next forecast");
+        renderInsights();
+      });
+    } catch (e) {
+      box.innerHTML = `<div class="muted">Forecast unavailable.</div>`;
+    }
+  }
+
+  /* ============================================================== SCHEDULE
+     7-day grid plus the heads-up that status apps are loved for: a warning
+     60 and 15 minutes BEFORE the lights go. */
+  async function renderSchedule() {
+    const box = $("#schedBox"); if (!box) return;
+    const a = activeArea(); if (!a) return;
+    box.innerHTML = `<div class="skeleton"></div>`;
+    try {
+      const j = await api(`/api/electricity/schedule?q=${encodeURIComponent(a.name)}` +
+        (a.lat != null ? `&lat=${a.lat}&lon=${a.lon}` : ""));
+      const sch = j.schedule; S.scheduleCache = sch;
+      if (!sch || !sch.upcoming || !sch.upcoming.length) {
+        box.innerHTML = `<div class="muted">${esc(j.hint || "No published schedule for this area.")}
+          <div class="mt8"><a class="btn sm ghost" target="_blank" rel="noopener"
+          href="https://loadshedding.eskom.co.za">Official Eskom schedule</a></div></div>`;
+        return;
+      }
+      const days = {};
+      sch.upcoming.forEach((w) => {
+        const d = new Date(w.start);
+        const key = d.toDateString().slice(0, 10);
+        (days[key] = days[key] || []).push({
+          start: d, end: new Date(w.end), stage: w.stage,
+        });
+      });
+      const next = sch.upcoming[0];
+      const mins = Math.round((new Date(next.start) - Date.now()) / 60000);
+      box.innerHTML = `
+        <div class="between">
+          <div><div class="tiny">${esc("Next switch-off")}</div>
+            <div class="countdown"><b class="num">${fmtMin(mins)}</b></div></div>
+          <div style="text-align:right"><div class="tiny">${esc(sch.estimated ? "estimated from stage pattern" : "from your area schedule")}</div>
+            <span class="badge ${sch.estimated ? "sim" : "official"}">${esc(sch.area || a.name)}</span></div>
+        </div>
+        <div class="grid2 mt8">
+          <button class="btn sm ${S.settings.heads60 ? "cyan" : "ghost"}" id="h60">⏰ 60 min heads-up</button>
+          <button class="btn sm ${S.settings.heads15 ? "cyan" : "ghost"}" id="h15">⚡ 15 min heads-up</button>
+        </div>
+        <div class="scrollx mt8">${Object.entries(days).map(([day, ws]) =>
+        `<div class="tile" style="min-width:96px"><span class="lb">${esc(day)}</span>
+          ${ws.map((w) => `<div class="vl num" style="font-size:12px">${w.start.toTimeString().slice(0, 5)}–${w.end.toTimeString().slice(0, 5)}</div>`).join("")}
+        </div>`).join("")}</div>`;
+      $("#h60").onclick = () => { S.settings.heads60 = !S.settings.heads60; saveSettings(); renderSchedule(); scheduleHeadsUps(); };
+      $("#h15").onclick = () => { S.settings.heads15 = !S.settings.heads15; saveSettings(); renderSchedule(); scheduleHeadsUps(); };
+      scheduleHeadsUps();
+    } catch (e) {
+      box.innerHTML = `<div class="muted">Schedule unavailable.</div>`;
+    }
+  }
+
+  function scheduleHeadsUps() {
+    const j = S.forecast; // unused guard
+    const sch = S.scheduleCache;
+    if (!sch || !sch.upcoming) return;
+    const fired = JSON.parse(localStorage.getItem("sw_heads") || "{}");
+    (sch.upcoming || []).forEach((w) => {
+      const start = new Date(w.start).getTime();
+      [[60, S.settings.heads60], [15, S.settings.heads15]].forEach(([lead, on]) => {
+        if (!on) return;
+        const key = w.start + "|" + lead;
+        if (fired[key]) return;
+        const at = start - lead * 60000 - Date.now();
+        if (at <= 0 || at > 6 * 3600 * 1000) return;
+        setTimeout(() => {
+          fired[key] = Date.now();
+          localStorage.setItem("sw_heads", JSON.stringify(fired));
+          notify("⚡ Load-shedding in " + lead + " min",
+            "Switch off sensitive appliances and charge devices now.");
+        }, at);
+      });
+    });
+  }
+
+  function notify(title, body) {
+    vibrate([60, 50, 60]);
+    if (window.Notification && Notification.permission === "granted") {
+      try { new Notification(title, { body }); } catch (e) {}
+    }
+    toast(title + " — " + body, 6000);
+  }
+
+  /* ======================================================== OFFLINE QUEUE
+     In a township the network dies exactly when you need to report. Reports,
+     offers and chat are queued on the device and sent the moment signal
+     returns — the user never loses what they wrote. */
+  async function post(path, body) {
+    const payload = { path, body: body || {}, at: Date.now() };
+    if (!navigator.onLine || S.offlineMode) {
+      S.queue.push(payload);
+      persistQueue();
+      queueBadge();
+      toast("Saved on your phone — it will send when you're back online");
+      return { ok: true, queued: true };
+    }
+    try {
+      const r = await api(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Device-Id": S.device },
+        body: JSON.stringify(payload.body),
+      });
+      return r;
+    } catch (e) {
+      S.queue.push(payload);
+      persistQueue();
+      queueBadge();
+      toast("Saved on your phone — it will send when you're back online");
+      return { ok: true, queued: true };
+    }
+  }
+
+  function persistQueue() {
+    try { localStorage.setItem("sw_queue", JSON.stringify(S.queue.slice(0, 40))); } catch (e) {}
+    queueBadge();
+  }
+  function loadQueue() {
+    try { S.queue = JSON.parse(localStorage.getItem("sw_queue") || "[]"); } catch (e) { S.queue = []; }
+    queueBadge();
+  }
+  function queueBadge() {
+    const el = $("#qBadge");
+    if (!el) return;
+    const n = (S.queue || []).length;
+    el.style.display = n ? "grid" : "none";
+    el.textContent = n;
+    el.setAttribute("aria-label", n + " reports waiting to send");
+  }
+  async function flushQueue() {
+    if (!S.queue || !S.queue.length) return;
+    let sent = 0;
+    const remaining = [];
+    for (const item of S.queue) {
+      try {
+        await api(item.path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Device-Id": S.device },
+          body: JSON.stringify(item.body),
+        });
+        sent++;
+      } catch (e) {
+        remaining.push(item);
+      }
+    }
+    S.queue = remaining;
+    persistQueue();
+    if (sent) toast(sent + " queued item(s) sent ✅");
+  }
+
+  /* =================================================== INTERACTIVE ONBOARD
+     People do not learn an app from three slides. They learn it by doing the
+     three things that matter, once, and getting rewarded for it. */
+  function showIntro() {
+    if (localStorage.getItem(LS.installed)) return;
+    const steps = [
+      { icon: "📍", title: "Add your street",
+        body: "ServiceWaze watches water, power, weather, routes and food prices for the place you actually live.",
+        cta: "Add my area", act: () => { openAdd(); } },
+      { icon: "⏳", title: "Do one preparation task",
+        body: "This is the whole point: acting BEFORE the outage. Tap one task on the Prepare tab and watch your score move.",
+        cta: "Show me the tasks", act: () => { go("prepare"); } },
+      { icon: "🤝", title: "Offer one thing",
+        body: "A litre, a plug, a seat, a check-in on a neighbour. The Grid is what turns information into survival.",
+        cta: "Open the Grid", act: () => { go("grid"); } },
+    ];
+    let i = 0;
+    const draw = () => {
+      const st = steps[i];
+      const sheet = $("#sheet");
+      sheet.innerHTML = `<div class="grab"></div>
+        <div style="font-size:38px;text-align:center">${st.icon}</div>
+        <h3 class="center">${esc(st.title)}</h3>
+        <p class="muted center">${esc(st.body)}</p>
+        <div class="center tiny mb8">${i + 1} of ${steps.length} · ${esc("each step earns XP")}</div>
+        <button class="btn primary wide mt8" id="introGo">${esc(st.cta)}</button>
+        <button class="btn ghost wide mt8" id="introSkip">${esc("Skip — I'll explore myself")}</button>`;
+      $("#overlay").classList.add("on");
+      $("#introGo").onclick = async () => {
+        try {
+          await post("/api/me/action", { device: S.device, action: "checkin",
+            meta: "onboarding-" + i, area: (activeArea() || {}).name });
+        } catch (e) {}
+        st.act();
+        if (i < steps.length - 1) { i++; setTimeout(draw, 700); }
+        else { localStorage.setItem(LS.installed, "1"); closeSheet(); toast("Welcome to ServiceWaze 🌍"); }
+      };
+      $("#introSkip").onclick = () => { localStorage.setItem(LS.installed, "1"); closeSheet(); };
+    };
+    draw();
+  }
+
+
+  /* ========================================================== ACCESSIBILITY
+     Accessibility is not a checkbox. Text size, contrast, motion and target
+     size are all adjustable from inside the app, and everything is announced. */
+  function applyA11y() {
+    const st = S.settings || {};
+    const root = document.documentElement;
+    root.setAttribute("data-text", st.textSize || "normal");
+    root.setAttribute("data-contrast", st.contrast || "normal");
+    root.setAttribute("data-motion", st.motion || "full");
+  }
+
+  function a11yControls() {
+    const st = S.settings || {};
+    return `
+      <div class="card tight">
+        <h2>♿ ${esc("Make it easier to use")}</h2>
+        <div class="kv"><span>${esc("Text size")}</span>
+          <span class="seg sm">${["normal", "large", "xl"].map((k) =>
+            `<button class="segbtn ${st.textSize === k ? "on" : ""}" data-text="${k}">${
+              k === "normal" ? "A" : k === "large" ? "A+" : "A++"}</button>`).join("")}</span></div>
+        <div class="kv"><span>${esc("High contrast")}</span>
+          <span class="switchbtn ${st.contrast === "high" ? "on" : ""}" data-contrast="high"><i></i></span></div>
+        <div class="kv"><span>${esc("Reduce motion")}</span>
+          <span class="switchbtn ${st.motion === "reduced" ? "on" : ""}" data-motion="reduced"><i></i></span></div>
+        <div class="tiny mt8">${esc("Every screen is labelled for screen readers and every button is at least 44 px tall.")}</div>
+      </div>`;
+  }
+
+  function wireA11y() {
+    $$("[data-text]").forEach((b) => b.onclick = () => {
+      S.settings.textSize = b.dataset.text; saveSettings(); applyA11y(); renderYou();
+    });
+    $$("[data-contrast]").forEach((b) => b.onclick = () => {
+      S.settings.contrast = S.settings.contrast === "high" ? "normal" : "high";
+      saveSettings(); applyA11y(); renderYou();
+    });
+    $$("[data-motion]").forEach((b) => b.onclick = () => {
+      S.settings.motion = S.settings.motion === "reduced" ? "full" : "reduced";
+      saveSettings(); applyA11y(); renderYou();
+    });
   }
 
   document.addEventListener("DOMContentLoaded", boot);

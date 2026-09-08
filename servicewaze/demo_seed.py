@@ -68,6 +68,45 @@ REPORTS = [
     ("Durban", "low_pressure", "Umlazi low pressure for four days now.", 70, 9, "open"),
 ]
 
+COORDS = {
+    "Soweto": (-26.2359, 27.8546),
+    "Alexandra": (-26.1027, 28.0856),
+    "Cape Town": (-33.9249, 18.4241),
+    "Durban": (-29.8587, 31.0218),
+    "Tembisa": (-25.9948, 28.2767),
+    "Gugulethu": (-33.9776, 18.5664),
+    "Umlazi": (-29.9667, 30.8833),
+    "Khayelitsha": (-34.0373, 18.6783),
+}
+JITTER = [(-0.011, 0.007), (0.008, -0.012), (0.015, 0.018), (-0.019, -0.008),
+          (0.004, 0.021), (-0.022, 0.013), (0.019, -0.019), (-0.007, -0.021),
+          (0.012, 0.004), (-0.014, 0.016)]
+
+BUSINESSES = [
+    ("Sipho's Plumbing", "plumbing", "Soweto", "082 441 0192", "Fixes burst pipes, 24h, Soweto & surrounding."),
+    ("Mama Nomsa Spaza", "food", "Soweto", "071 220 8841", "Runs on gas — open during load shedding, cold drinks & bread."),
+    ("Pimville Water Delivery", "water", "Soweto", "083 771 5560", "5 000 L tanker delivery, same day, cash or stokvel."),
+    ("Lerato Solar & Backup", "solar", "Alexandra", "084 990 3317", "Installs lights + phone charging; battery rental per day."),
+    ("Zone 3 Gas Refills", "gas", "Soweto", "061 118 2245", "9 kg refills; safe-stove demo with every first refill."),
+    ("Alex Cold Room", "cold", "Alexandra", "078 302 7714", "Cold storage for stokvel bulk meat and veg; R/day."),
+    ("Thabo Electrical", "electrical", "Soweto", "082 665 1109", "Legal reconnects, earth leakage, generator changeover."),
+    ("Umlazi Transport Co-op", "transport", "Durban", "073 559 0028", "Bakkie delivery — water, gas, parcels across Umlazi."),
+]
+
+OPEN_BOARD = [
+    ("Mama Nomsa Spaza", "Soweto", "open", "Generator on until 21:00 — cold drinks, bread, airtime."),
+    ("Lerato Solar & Backup", "Alexandra", "open", "Phones and power banks charging, R5 a charge."),
+    ("Zone 3 Gas Refills", "Soweto", "closed", "No stock until the truck lands tomorrow 10:00."),
+]
+
+OUTCOMES = [
+    ("Soweto", "water", True, "Verified burst pipe — supply interrupted overnight."),
+    ("Soweto", "power", True, "Mini-substation tripped during the storm."),
+    ("Soweto", "transport", False, "Rea Vaya ran normally all day."),
+    ("Alexandra", "water", True, "Main burst, tanker arrived late."),
+    ("Soweto", "power", False, "Scheduled window passed without an outage."),
+]
+
 STOKVELS = [
     ("Pimville Street Tank", "tank", "Soweto", 4500, [
         ("demo-thabo", 800), ("demo-nomsa", 600), ("demo-marie", 1500), ("demo-sipho", 250)]),
@@ -83,7 +122,10 @@ def reset():
     for tbl, col in [("offers", "device"), ("claims", "device"), ("stokvels", "device"),
                      ("stokvel_members", "handle"), ("reports", "reporter"),
                      ("actions", "device"), ("savings", "device"), ("badges", "device"),
-                     ("neighbours", "device"), ("profile", "device")]:
+                     ("neighbours", "device"), ("profile", "device"),
+                     ("businesses", "device"), ("open_board", "device"),
+                     ("business_verifiers", "device"), ("outcomes", "area"),
+                     ("predictions", "area")]:
         try:
             con.execute(f"DELETE FROM {tbl} WHERE {col} LIKE 'demo-%'")
         except Exception as e:
@@ -131,11 +173,15 @@ def seed():
     for i, (kind, title, detail, area, avail) in enumerate(OFFERS):
         dev = "demo-" + ["thabo", "nomsa", "marie", "lerato", "sipho", "ayanda", "fikile", "bongani"][i % 8]
         you = resilience.identify(dev, area)
-        grid_mod.add(kind, "offer", title, detail, area, None, None, dev, you["handle"], avail)
+        lat, lon = COORDS.get(area, COORDS["Soweto"])
+        jx, jy = JITTER[i % len(JITTER)]
+        grid_mod.add(kind, "offer", title, detail, area, lat + jx, lon + jy, dev, you["handle"], avail)
     for i, (kind, title, detail, area, avail) in enumerate(NEEDS):
         dev = "demo-" + ["sipho", "bongani", "lerato", "thabo", "nomsa"][i % 5]
         you = resilience.identify(dev, area)
-        grid_mod.add(kind, "need", title, detail, area, None, None, dev, you["handle"], avail)
+        lat, lon = COORDS.get(area, COORDS["Soweto"])
+        jx, jy = JITTER[(i + 3) % len(JITTER)]
+        grid_mod.add(kind, "need", title, detail, area, lat + jx, lon + jy, dev, you["handle"], avail)
 
     # stokvels
     for name, purpose, area, target, members in STOKVELS:
@@ -147,8 +193,10 @@ def seed():
             grid_mod.stokvel_contribute(out["id"], amt, mdev, h)
 
     # reports → receipts
-    for area, kind, msg, hours_ago, confirms, status in REPORTS:
-        rid = sources.add_report(area, kind, msg, "demo-neighbour", None, None)
+    for i, (area, kind, msg, hours_ago, confirms, status) in enumerate(REPORTS):
+        lat, lon = COORDS.get(area, COORDS["Soweto"])
+        jx, jy = JITTER[i % len(JITTER)]
+        rid = sources.add_report(area, kind, msg, "demo-neighbour", lat + jx, lon + jy)
         con = sqlite3.connect(DB)
         con.execute("UPDATE reports SET confirms=?, created=? WHERE id=?",
                     (confirms, (now - timedelta(hours=hours_ago)).isoformat(timespec="seconds"), rid))
@@ -161,11 +209,35 @@ def seed():
         elif hours_ago > 24:
             receipts.update(rid, "Logged with the depot — awaiting crew", "demo")
 
+    # climate-smart businesses + the "who is open" board
+    for i, (name, cat, area, contact, detail) in enumerate(BUSINESSES):
+        dev = "demo-" + ["thabo", "nomsa", "marie", "lerato", "sipho", "ayanda", "fikile", "bongani"][i % 8]
+        lat, lon = COORDS.get(area, COORDS["Soweto"])
+        jx, jy = JITTER[i % len(JITTER)]
+        out = grid_mod.business_add(name, cat, area, contact, detail, lat + jx, lon + jy, dev)
+        for v in ["demo-thabo", "demo-nomsa", "demo-sipho"][:(i % 3) + 1]:
+            try:
+                grid_mod.business_verify(out["business"]["id"], v)
+            except Exception:
+                pass
+    for name, area, status, note in OPEN_BOARD:
+        grid_mod.post_open(name, area, status, note,
+                           "demo-" + ["thabo", "nomsa", "lerato"][OPEN_BOARD.index((name, area, status, note)) % 3])
+
+    # a little history so the forecast has something to learn from
+    try:
+        import insights
+        for area, service, happened, note in OUTCOMES:
+            insights.record_outcome(area, service, happened, note)
+    except Exception as e:
+        print("skip outcomes", e)
+
     print("Seeded demo data:")
     print("  neighbours :", len(NEIGHBOURS))
     print("  grid       :", len(OFFERS), "offers /", len(NEEDS), "requests")
     print("  stokvels   :", len(STOKVELS))
     print("  receipts   :", len(REPORTS))
+    print("  businesses :", len(BUSINESSES), "/", len(OPEN_BOARD), "open-board posts")
     print("Run: uvicorn app:app --port 8000")
 
 

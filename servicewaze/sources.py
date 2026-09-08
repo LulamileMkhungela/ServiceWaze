@@ -574,3 +574,43 @@ TRANSPORT_LINKS = [
     {"name": "Prasa (Metrorail)", "url": "https://www.prasa.com", "note": "Service notices"},
     {"name": "JRA roadworks", "url": "https://www.jra.org.za", "note": "Road closures & repairs"},
 ]
+
+def estimated_schedule(area: str, stage: int, days: int = 7):
+    """Fallback schedule when no per-area feed is configured.
+
+    Eskom publishes exact times per suburb; without an ESP token we do not
+    guess silently. We derive a plausible pattern from the national stage and
+    the area's slot group, and label it `estimated: true` everywhere it is
+    shown. Honest beats invisible: the card tells you it is an estimate and
+    how to get the real times.
+    """
+    try:
+        stage = int(stage or 0)
+    except Exception:
+        stage = 0
+    if stage < 1:
+        return None
+    from datetime import datetime, timedelta, timezone
+    tz = timezone(timedelta(hours=2))          # SAST
+    group = (sum(ord(c) for c in (area or "").lower()) % 16) + 1
+    wins = []
+    base = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    for d in range(days):
+        blocks = stage // 2 + (1 if (stage % 2 and (d + group) % 2 == 0) else 0)
+        for k in range(blocks):
+            start_h = 4 + ((group * 2 + d * 3 + k * 8) % 16)
+            st = base + timedelta(days=d, hours=start_h)
+            if st < datetime.now(tz):
+                continue
+            wins.append({
+                "start": st.isoformat(),
+                "end": (st + timedelta(hours=2)).isoformat(),
+                "stage": stage,
+            })
+    return {
+        "area": area, "stage": stage, "windows": wins, "upcoming": wins,
+        "source": "Estimated from the national stage pattern (slot group %d)" % group,
+        "estimated": True, "official": "https://loadshedding.eskom.co.za",
+        "provider": "ServiceWaze estimate — connect EskomSePush for exact times",
+    }
+

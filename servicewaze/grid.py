@@ -342,3 +342,147 @@ def stats() -> dict:
     con.close()
     return {"open_offers": offers, "open_needs": needs, "hand_overs": claimed,
             "stokvels": pots[0], "stokvel_rand": round(pots[1] or 0, 2)}
+
+
+# ---------------------------------------------------------------------------
+# Climate-smart small business: the local resilience economy
+#
+# A disruption is also an economy. The plumber who fixes the burst pipe, the
+# spaza with a generator, the installer putting up JoJo tanks, the woman who
+# sells ice during load-shedding — these are the businesses that keep a
+# township running, and they are invisible online.
+#
+# Two surfaces:
+#   * PROVIDERS  — a verified directory of resilience trades and services
+#   * OPEN BOARD — "we're open / closed / generator on right now", which is
+#                  simultaneously food access for residents and footfall for
+#                  the business. Entries expire after 24 h so the board never
+#                  lies.
+# ---------------------------------------------------------------------------
+BUSINESS_CATEGORIES = {
+    "water": {"icon": "🛢️", "label": "Water: tanks, boreholes, delivery"},
+    "solar": {"icon": "☀️", "label": "Solar, batteries, inverters"},
+    "gas": {"icon": "🔥", "label": "Gas, stoves, cylinders"},
+    "plumbing": {"icon": "🔧", "label": "Plumbing & leaks"},
+    "electrical": {"icon": "⚡", "label": "Electrical & wiring"},
+    "food": {"icon": "🥫", "label": "Food: spaza, bakery, cooked food"},
+    "cold": {"icon": "🧊", "label": "Cold storage & ice"},
+    "transport": {"icon": "🚐", "label": "Transport & delivery"},
+    "other": {"icon": "🏪", "label": "Other services"},
+}
+
+BUSINESS_CHECKLIST = {
+    "title": "Business continuity in 6 moves",
+    "steps": [
+        "Know your interruption windows: log the last 90 days of outages for your block (ServiceWaze does this for you).",
+        "Protect the till: a small UPS keeps a card machine, router and light alive for 4 hours.",
+        "Protect the stock: a cooler box and a frozen bottle buys 6 hours for perishables.",
+        "Post your status: 'open on generator' on the Open board brings customers through the door.",
+        "Have one alternative supplier for water and one for power, tested before you need them.",
+        "Insure and document: photograph stock before and after a long outage — you will need it for a claim.",
+    ],
+}
+
+OPEN_TTL_HOURS = 24
+
+
+def _db_business(con):
+    con.execute("""CREATE TABLE IF NOT EXISTS businesses(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, category TEXT, area TEXT,
+        lat REAL, lon REAL, contact TEXT, detail TEXT, verified INTEGER DEFAULT 0,
+        device TEXT, created TEXT)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS open_board(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, area TEXT, status TEXT,
+        note TEXT, device TEXT, created TEXT)""")
+    con.commit()
+
+
+def business_list(area: str = "", category: str = "", limit: int = 40) -> dict:
+    con = _db()
+    _db_business(con)
+    q = "SELECT id,name,category,area,lat,lon,contact,detail,verified FROM businesses"
+    args = []
+    where = []
+    if area:
+        where.append("area LIKE ?")
+        args.append(f"%{area[:40]}%")
+    if category and category in BUSINESS_CATEGORIES:
+        where.append("category=?")
+        args.append(category)
+    if where:
+        q += " WHERE " + " AND ".join(where)
+    q += " ORDER BY verified DESC, id DESC LIMIT ?"
+    args.append(limit)
+    rows = con.execute(q, args).fetchall()
+    con.close()
+    return {"businesses": [
+        {"id": r[0], "name": r[1], "category": r[2], "area": r[3], "lat": r[4], "lon": r[5],
+         "contact": r[6], "detail": r[7], "verified": r[8],
+         "icon": BUSINESS_CATEGORIES.get(r[2], BUSINESS_CATEGORIES["other"])["icon"]}
+        for r in rows],
+        "categories": BUSINESS_CATEGORIES, "checklist": BUSINESS_CHECKLIST}
+
+
+def business_add(name, category, area, contact, detail, lat, lon, device) -> dict:
+    con = _db()
+    _db_business(con)
+    cur = con.execute("INSERT INTO businesses(name, category, area, lat, lon, contact, detail,"
+                      " verified, device, created) VALUES(?,?,?,?,?,?,?,0,?,?)",
+                      (name[:80], category if category in BUSINESS_CATEGORIES else "other",
+                       area[:80], lat, lon, contact[:60], detail[:300], device[:64], _now()))
+    con.commit()
+    rid = cur.lastrowid
+    con.close()
+    return {"id": rid, "ok": True}
+
+
+def business_verify(bid: int, device: str) -> dict:
+    """Neighbour verification — one verified-by count per device, ever."""
+    con = _db()
+    _db_business(con)
+    con.execute("""CREATE TABLE IF NOT EXISTS business_verifiers(
+        business_id INTEGER, device TEXT, created TEXT, PRIMARY KEY(business_id, device))""")
+    cur = con.execute("INSERT OR IGNORE INTO business_verifiers(business_id, device, created)"
+                      " VALUES(?,?,?)", (bid, device[:64], _now()))
+    con.commit()
+    if cur.rowcount:
+        con.execute("UPDATE businesses SET verified = verified + 1 WHERE id=?", (bid,))
+        con.commit()
+    row = con.execute("SELECT verified FROM businesses WHERE id=?", (bid,)).fetchone()
+    con.close()
+    return {"ok": True, "verified": row[0] if row else 0}
+
+
+def open_board(area: str = "", limit: int = 30) -> dict:
+    """Who is open right now, and who had to close. Entries expire in 24 h."""
+    con = _db()
+    _db_business(con)
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=OPEN_TTL_HOURS)).isoformat(timespec="seconds")
+    con.execute("DELETE FROM open_board WHERE created < ?", (cutoff,))
+    con.commit()
+    if area:
+        rows = con.execute("SELECT id,name,area,status,note,created FROM open_board"
+                           " WHERE area LIKE ? ORDER BY id DESC LIMIT ?",
+                           (f"%{area[:40]}%", limit)).fetchall()
+    else:
+        rows = con.execute("SELECT id,name,area,status,note,created FROM open_board"
+                           " ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    con.close()
+    items = [{"id": r[0], "name": r[1], "area": r[2], "status": r[3], "note": r[4],
+              "created": r[5]} for r in rows]
+    return {"board": items,
+            "open": [i for i in items if i["status"] == "open"],
+            "closed": [i for i in items if i["status"] == "closed"],
+            "ttl_hours": OPEN_TTL_HOURS}
+
+
+def post_open(name, area, status, note, device) -> dict:
+    con = _db()
+    _db_business(con)
+    con.execute("INSERT INTO open_board(name, area, status, note, device, created)"
+                " VALUES(?,?,?,?,?,?)",
+                (name[:80], area[:80], "open" if status == "open" else "closed",
+                 note[:200], device[:64], _now()))
+    con.commit()
+    con.close()
+    return {"ok": True}
