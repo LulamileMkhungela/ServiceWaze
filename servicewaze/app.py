@@ -41,6 +41,7 @@ import i18n
 import impact
 import insights
 import watch as watch_mod
+import safety
 import net
 import push
 import receipts
@@ -639,6 +640,92 @@ def stokvel_contribute(sid: int, body: ContribIn, request: Request):
 def stokvel_detail(sid: int):
     return grid_mod.stokvel_detail(sid)
 
+
+
+
+# ---------------------------------------------------------------------------
+# Safety — SafeWalk, SOS, hazard receipts (Public Safety & GBV)
+# ---------------------------------------------------------------------------
+@app.get("/api/safety/resources")
+def safety_resources():
+    return safety.resources()
+
+
+@app.get("/api/safety/walks")
+def safety_walks(area: str = "", device: str = ""):
+    return safety.walks(area.strip() or "Soweto", device.strip())
+
+
+class WalkIn(BaseModel):
+    device: str = ""
+    area: str = ""
+    dest: str = ""
+    minutes: int = 20
+    note: str = ""
+
+
+@app.post("/api/safety/walk")
+def safety_walk_start(body: WalkIn, request: Request):
+    _throttle(request, "walk", 20)
+    return safety.walk_start(_device(request, body.device), body.area.strip(),
+                             body.dest.strip(), body.minutes, body.note.strip())
+
+
+class WalkIdIn(BaseModel):
+    device: str = ""
+    id: int = 0
+
+
+@app.post("/api/safety/walk/arrive")
+def safety_walk_arrive(body: WalkIdIn, request: Request):
+    return safety.walk_arrive(body.id, _device(request, body.device))
+
+
+@app.post("/api/safety/walk/check")
+def safety_walk_check(body: WalkIdIn, request: Request):
+    return safety.walk_check(body.id, _device(request, body.device))
+
+
+@app.post("/api/safety/walk/alert")
+def safety_walk_alert(body: WalkIdIn, request: Request):
+    return safety.walk_alert(body.id, _device(request, body.device))
+
+
+class SosIn(BaseModel):
+    device: str = ""
+    area: str = ""
+    note: str = ""
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+
+
+@app.post("/api/safety/sos")
+def safety_sos(body: SosIn, request: Request):
+    return safety.sos(_device(request, body.device), body.area.strip(),
+                      body.note.strip(), body.lat, body.lon)
+
+
+@app.get("/api/safety/alerts")
+def safety_alerts(area: str = "", limit: int = 15):
+    return safety.alerts(area.strip(), limit)
+
+
+class UnsafeIn(BaseModel):
+    device: str = ""
+    area: str = ""
+    kind: str = "other_safety"
+    message: str = ""
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+
+
+@app.post("/api/safety/unsafe")
+def safety_unsafe(body: UnsafeIn, request: Request):
+    if len(body.message.strip()) < 4:
+        raise HTTPException(400, "describe the hazard briefly")
+    _throttle(request, "unsafe", 20)
+    return safety.report_unsafe(body.area.strip(), body.kind, body.message.strip(),
+                                _device(request, body.device), body.lat, body.lon)
 
 
 

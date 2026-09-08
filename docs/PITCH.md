@@ -97,7 +97,7 @@
 | **Innovation** | Prepare Window (countdown *to* impact), provenance-tagged data, Ubuntu Grid, stokvels, real-tariff money engine |
 | **Problem solved / impact** | Water, power, transport, food, money — five of the six focus areas, end to end, with measurable rand saved |
 | **Usability / UI** | 5-tab thumb-first PWA, one-screen answer, zero setup, offline, data-saver, read-aloud, dark/light |
-| **Technical execution** | FastAPI + 87 endpoints, sqlite, tiered async fetch with caching and graceful degradation, service worker, Web Push, 45 automated tests, headless JS smoke test |
+| **Technical execution** | FastAPI + 96 endpoints, sqlite, tiered async fetch with caching and graceful degradation, service worker, Web Push, 50 automated tests, headless JS smoke test |
 | **Local relevance** | SA tariffs, SA municipalities, SA languages, SA food-basket data, SA transport operators |
 | **Scalability / sustainability** | B2G comms contracts, B2B API, business freemium, group-buy margin |
 | **Accessibility / inclusion** | USSD, WhatsApp, offline, low-data, 5 languages, no login, no tracking, POPIA design |
@@ -106,6 +106,11 @@
 
 ## 6. What is real vs. demo in the sandbox
 
+* **It answers *both* hackathon problem statements, not one.** *Climate Resilience & Food Security*
+  (Prepare Window, Ubuntu Grid, money engine, food basket, climate-smart business mode) **and**
+  *Public Safety & Gender-Based Violence* (SafeWalk, SOS with verified helplines, hazard → repair
+  receipt). We could not find another entry that fuses them — and the fusion is the point: the same
+  street that loses water at 18:00 is the street where the walk home is dark.
 * **Real code paths, real endpoints.** Weather, air quality, geocoding, radar, Eskom status, EskomSePush, Johannesburg Water, Google News, Mastodon and OpenStreetMap Overpass all hit their production URLs.
 * **Tariff tables are real and dated** (2026/27), with the source in the response.
 * **Demo data** appears only when an upstream is unreachable — and is **badged `DEMO`** in the UI, with the source console showing `sim`.

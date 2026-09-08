@@ -201,7 +201,7 @@ const code = fs.readFileSync(path.join(ROOT, "static", "js", "app.js"), "utf8");
     if (b && b._onclick) { try { b._onclick(); } catch (e) { errors.push(e); } }
     await new Promise((r) => setTimeout(r, 500));
   }
-  for (const sel of ["[data-out]", "[data-verify]", "[data-check]", "[data-help]", "[data-text]", "[data-contrast]", "[data-motion]", "[data-bc]"]) {
+  for (const sel of ["[data-out]", "[data-verify]", "[data-check]", "[data-help]", "[data-arrive]", "[data-alertwalk]", "[data-checkwalk]", "[data-uk]", "[data-text]", "[data-contrast]", "[data-motion]", "[data-bc]"]) {
     const btns = document.querySelectorAll(sel);
     if (btns[0] && btns[0]._onclick) { try { btns[0]._onclick(); } catch (e) { errors.push(e); } }
     await new Promise((r) => setTimeout(r, 250));
@@ -218,14 +218,14 @@ const code = fs.readFileSync(path.join(ROOT, "static", "js", "app.js"), "utf8");
     for (const id of ["sec-now", "sec-prepare", "sec-grid", "sec-community", "sec-you"])
       fs.writeFileSync(`/tmp/${id}.html`, el("#" + id).innerHTML);
     for (const id of ["gridBody", "costBox", "feedBox", "recBox", "srcBox", "chatBox", "profBox", "energyBox",
-                      "insightBox", "schedBox", "mapList", "mapNote", "watchBox"]) {
+                      "insightBox", "schedBox", "mapList", "mapNote", "watchBox", "safetyBox"]) {
       const h = el("#" + id).innerHTML;
       console.log(`  #${id.padEnd(10)} ${String(h.length).padStart(6)} chars`);
       fs.writeFileSync(`/tmp/${id}.html`, h);
     }
   }
 
-  for (const id of ["insightBox", "schedBox", "watchBox"]) {
+  for (const id of ["insightBox", "schedBox", "watchBox", "safetyBox"]) {
     const h = el("#" + id).innerHTML;
     if (h.length < 20) { console.log(`  FAIL: #${id} rendered nothing`); process.exit(1); }
   }

@@ -3,6 +3,7 @@ import os
 import sys
 import pytest
 import time
+from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -21,6 +22,7 @@ import sources                       # noqa: E402
 import tariffs                       # noqa: E402
 import transport                     # noqa: E402
 import ussd                          # noqa: E402
+import safety                        # noqa: E402
 import watch                         # noqa: E402
 import whatsapp                      # noqa: E402
 
@@ -36,7 +38,7 @@ def client():
 # ----------------------------------------------------------------- modules
 def test_module_imports():
     for m in (app_module, auth, feeds, grid_mod, i18n, impact, insights, push,
-              receipts, resilience, sources, tariffs, transport, ussd, watch, whatsapp):
+              receipts, resilience, safety, sources, tariffs, transport, ussd, watch, whatsapp):
         assert m is not None
 
 
@@ -418,3 +420,65 @@ def test_watch_endpoints(client):
     dup = client.post("/api/watch/add", json={"device": DEVICE, "handle": "Test Neighbour",
                                               "area": area}).json()
     assert dup["ok"] is False          # you cannot watch the same person twice
+
+
+# ------------------------------------------------------------------- safety
+def test_curated_helplines_are_sourced():
+    r = safety.resources()
+    assert r["tier"] == "curated"
+    nums = {c["tel"] for c in r["resources"]}
+    assert "0800 428 428" in nums          # GBV Command Centre
+    assert "10111" in nums and "112" in nums
+    assert all(c.get("source") for c in r["resources"]), "every number must cite a source"
+    assert any(k["id"] == "streetlight" for k in r["unsafe_kinds"])
+
+
+def test_safewalk_arrive_and_overdue():
+    w = safety.walk_start("pytest-s1", "Pytestville", "home", 20)
+    assert w["ok"] is True and w["due_minutes"] == 20
+    assert safety.walk_arrive(w["id"], "pytest-s1")["status"] == "arrived"
+    # a second walk pushed into the past must read as overdue
+    w2 = safety.walk_start("pytest-s2", "Pytestville", "shop", 5)
+    import sqlite3 as _sq
+    con = _sq.connect(safety.DB)
+    con.execute("UPDATE walks SET due=? WHERE id=?",
+                ((datetime.now(timezone.utc) - timedelta(minutes=9)).isoformat(timespec="seconds"), w2["id"]))
+    con.commit(); con.close()
+    rows = [x for x in safety.walks("Pytestville", "pytest-s2")["walks"] if x["id"] == w2["id"]]
+    assert rows and rows[0]["overdue_by"] > 0
+    assert safety.walk_check(w2["id"], "pytest-s3")["ok"] is True
+    assert safety.walk_alert(w2["id"], "pytest-s2")["status"] == "alerted"
+
+
+def test_sos_raises_an_alert():
+    r = safety.sos("pytest-s4", "Pytestville", "being followed", -26.2, 27.8)
+    assert r["ok"] is True and r["notified"] >= 0
+    assert any(c["id"] == "gbvcc" for c in r["resources"])
+    a = safety.alerts("Pytestville")
+    assert any(x["handle"] == r["handle"] for x in a["alerts"])
+
+
+def test_unsafe_place_becomes_a_receipt():
+    out = safety.report_unsafe("Soweto", "streetlight", "Pole 14 dark for three weeks", "pytest-s5")
+    assert out["ok"] is True
+    rec = out["receipt"]
+    assert rec["ref"].startswith("SW-")
+    assert "safety" in (rec.get("entity") or "").lower() or "public safety" in (rec.get("entity") or "").lower()
+    assert rec["sla_hours"] == 72
+
+
+def test_safety_endpoints(client):
+    res = client.get("/api/safety/resources").json()
+    assert res["tier"] == "curated"
+    w = client.post("/api/safety/walk", json={"device": DEVICE, "area": "Pytestville",
+                                              "dest": "home", "minutes": 15}).json()
+    assert w["ok"] is True
+    assert client.post("/api/safety/walk/arrive", json={"device": DEVICE, "id": w["id"]}).json()["ok"] is True
+    s = client.post("/api/safety/sos", json={"device": DEVICE, "area": "Pytestville",
+                                             "note": "test"}).json()
+    assert s["ok"] is True
+    assert client.get("/api/safety/alerts?area=Pytestville").json()["alerts"]
+    u = client.post("/api/safety/unsafe", json={"device": DEVICE, "area": "Soweto",
+                                                "kind": "streetlight",
+                                                "message": "dark corner by the shop"}).json()
+    assert u["ok"] is True and u["receipt"]["ref"].startswith("SW-")

@@ -761,6 +761,11 @@
         </div>` : ""}
         <div id="recBox"></div>
       </div>
+      <div class="card tight safety">
+        <h2>🛡️ ${esc("Safety")} <span class="spacer"></span><button class="btn sm primary" id="sosBtn2">🆘 SOS</button></h2>
+        <div id="safetyBox"><div class="skeleton"></div></div>
+      </div>
+
       <div class="card tight">
         <h2>👀 ${esc("Look out for each other")}</h2>
         <div id="watchBox"><div class="skeleton"></div></div>
@@ -784,7 +789,8 @@
     $$("#feedSeg button").forEach(b => b.onclick = () => { S.feedFilter = b.dataset.f; renderCommunity(); });
     $("#authLink").onclick = (e) => { e.preventDefault(); openAuth(); };
     $("#chatSend").onclick = sendChat;
-    renderFeed(); renderReceipts(); renderChat(); renderSources(); renderInsights(); renderWatch();
+    renderFeed(); renderReceipts(); renderChat(); renderSources(); renderInsights(); renderWatch(); renderSafety();
+    const sb = $("#sosBtn2"); if (sb) sb.onclick = openSos;
   }
 
   function renderFeed() {
@@ -1042,7 +1048,8 @@
   function openReport() {
     const a = activeArea();
     const kinds = [["no_water", "🚫💧 No water"], ["low_pressure", "🚰 Low pressure"], ["leak", "💦 Leak / burst"],
-    ["power_out", "⚡ Power out"], ["route", "🚌 Route disrupted"], ["restored", "✅ Restored"], ["other", "❓ Other"]];
+    ["power_out", "⚡ Power out"], ["route", "🚌 Route disrupted"], ["unsafe", "🚨 Unsafe place"],
+    ["restored", "✅ Restored"], ["other", "❓ Other"]];
     const sheet = $("#sheet");
     sheet.innerHTML = `<div class="grab"></div><h3>📣 ${esc(t("report", "Report"))}</h3>
       <p class="muted" style="margin:0 0 8px">${esc("You'll get a tracked receipt with an SLA clock and the responsible entity.")}</p>
@@ -1188,6 +1195,11 @@
     }
     loadQueue();
     applyA11y();
+    const sosTop = $("#sosBtn"); if (sosTop) sosTop.onclick = openSos;
+    try {
+      const wk = JSON.parse(localStorage.getItem("sw_walk") || "null");
+      if (wk && new Date(wk.due).getTime() > Date.now()) scheduleWalkAlarm(wk);
+    } catch (e) {}
     window.addEventListener("online", () => {
       renderHeader(); flushQueue(); loadArea(true);
     });
@@ -1244,8 +1256,10 @@
         title: p.name, sub: p.distance_m + " m", kind: "point" })));
     (S.grid.businesses || []).forEach((b) => pins.push({ lat: b.lat, lon: b.lon, icon: b.icon || "🏪",
       title: b.name, sub: b.contact || b.area || "", kind: "business" }));
-    (S.receipts || []).slice(0, 12).forEach((r) => pins.push({ lat: r.lat, lon: r.lon, icon: "🧾",
-      title: r.kind.replace(/_/g, " ") + " · " + r.area, sub: r.state, kind: "receipt" }));
+    (S.receipts || []).slice(0, 12).forEach((r) => pins.push({ lat: r.lat, lon: r.lon,
+      icon: r.kind === "unsafe" ? "🚨" : "🧾",
+      title: (r.kind === "unsafe" ? "Unsafe place · " : "") + r.kind.replace(/_/g, " ") + " · " + r.area,
+      sub: r.state, kind: "receipt" }));
     return pins.filter((p) => p.lat != null && p.lon != null);
   }
 
@@ -1781,6 +1795,178 @@
       });
     } catch (e) {
       box.innerHTML = `<div class="muted">Watch circle unavailable.</div>`;
+    }
+  }
+
+
+  /* ================================================================= SAFETY
+     Public Safety & Gender-Based Violence is half the hackathon brief, and no
+     service app touches it. Three pieces, all working: SafeWalk (a deadline
+     shared with your circle), SOS (one tap + verified helplines), and hazard
+     reports that become municipal receipts with an SLA. */
+  function openSos() {
+    const a = activeArea();
+    const area = a ? a.name.split(",")[0] : "";
+    const sheet = $("#sheet");
+    sheet.innerHTML = `<div class="grab"></div>
+      <h3>🆘 ${esc("Emergency")}</h3>
+      <p class="muted" style="margin:0 0 8px">${esc("ServiceWaze alerts neighbours in " + (area || "your area") +
+        " — it does not call the police. If you are in danger now, call them first.")}</p>
+      <div class="grid2">
+        <a class="btn primary" href="tel:10111">🚓 ${esc("Police 10111")}</a>
+        <a class="btn primary" href="tel:112">📱 ${esc("Mobile 112")}</a>
+        <a class="btn" href="tel:0800428428">🟣 ${esc("GBV 0800 428 428")}</a>
+        <a class="btn" href="tel:10177">🚑 ${esc("Ambulance 10177")}</a>
+      </div>
+      <div class="tiny mt8">${esc("112 and 0800 428 428 are free. *120*7867# asks a social worker to call you back.")}</div>
+      <label class="fl mt12">${esc("What's happening? (optional)")}</label>
+      <input id="sosNote" maxlength="160" placeholder="${esc("e.g. being followed near the rank")}">
+      <div class="grid2 mt12">
+        <button class="btn ghost" id="sosCancel">${esc(t("cancel", "Cancel"))}</button>
+        <button class="btn primary" id="sosSend">🆘 ${esc("Alert my street")}</button>
+      </div>
+      <div class="tiny mt8">${esc("If you add your location it is rounded to about 100 m — enough for help, not enough to track you.")}</div>`;
+    $("#overlay").classList.add("on");
+    $("#sosCancel").onclick = closeSheet;
+    $("#sosSend").onclick = async () => {
+      let lat = null, lon = null;
+      if (a && a.lat != null && window.confirm && window.confirm("Share your approximate location (±100 m)?")) {
+        lat = a.lat; lon = a.lon;
+      }
+      const r = await post("/api/safety/sos", { device: S.device, area,
+        note: $("#sosNote").value.trim(), lat, lon });
+      toast(r.ok ? "SOS sent — neighbours in " + area + " are being alerted" : "Could not send the alert");
+      closeSheet();
+      renderSafety();
+    };
+  }
+
+  function openWalkSheet() {
+    const a = activeArea();
+    const sheet = $("#sheet");
+    sheet.innerHTML = `<div class="grab"></div>
+      <h3>🚶 ${esc("Walk with me")}</h3>
+      <p class="muted" style="margin:0 0 8px">${esc("Say where you're going and how long it should take. "
+        + "If you don't tap 'I arrived', your street is told to check on you. No GPS trail is kept.")}</p>
+      <label class="fl">${esc("Going to")}</label><input id="wkDest" maxlength="80" placeholder="e.g. home from the taxi rank">
+      <label class="fl">${esc("Should take (minutes)")}</label>
+      <select id="wkMin">${[10, 15, 20, 30, 45, 60].map((m) =>
+        `<option value="${m}" ${m === 20 ? "selected" : ""}>${m} min</option>`).join("")}</select>
+      <label class="fl">${esc("Route note (optional)")}</label><input id="wkNote" maxlength="140" placeholder="e.g. via Vilakazi Street">
+      <div class="grid2 mt12"><button class="btn ghost" id="wkCancel">${esc(t("cancel", "Cancel"))}</button>
+      <button class="btn primary" id="wkSend">🚶 ${esc("Start walk")}</button></div>`;
+    $("#overlay").classList.add("on");
+    $("#wkCancel").onclick = closeSheet;
+    $("#wkSend").onclick = async () => {
+      const r = await post("/api/safety/walk", { device: S.device, area: a ? a.name.split(",")[0] : "",
+        dest: $("#wkDest").value.trim(), minutes: +$("#wkMin").value, note: $("#wkNote").value.trim() });
+      if (r.ok) {
+        S.walkDeadline = r.due;
+        scheduleWalkAlarm(r);
+        toast("Walk started — tap ‘I arrived’ when you get there");
+      }
+      closeSheet(); renderSafety();
+    };
+  }
+
+  function scheduleWalkAlarm(w) {
+    // works even if the server is unreachable: the phone holds the deadline
+    try { localStorage.setItem("sw_walk", JSON.stringify(w)); } catch (e) {}
+    const ms = new Date(w.due).getTime() - Date.now();
+    if (ms > 0 && ms < 6 * 3600 * 1000) {
+      setTimeout(() => {
+        const live = JSON.parse(localStorage.getItem("sw_walk") || "null");
+        if (!live || live.id !== w.id) return;
+        notify("🚶 Did you arrive?", "Your SafeWalk time is up. Tap ‘I arrived’ or your street will be asked to check.");
+      }, ms);
+    }
+  }
+
+  function openUnsafeSheet() {
+    const a = activeArea();
+    const sheet = $("#sheet");
+    sheet.innerHTML = `<div class="grab"></div>
+      <h3>🌑 ${esc("Report an unsafe place")}</h3>
+      <p class="muted" style="margin:0 0 8px">${esc("Dark streets, broken lights, open manholes. "
+        + "It becomes a tracked repair receipt with a 72-hour SLA — fixing the light is cheaper than policing the dark.")}</p>
+      <div class="grid2" id="unsafeKinds"></div>
+      <label class="fl mt8">${esc("Describe it")}</label><input id="unMsg" maxlength="200" placeholder="${esc("e.g. pole 14 dark for three weeks")}">
+      <div class="grid2 mt12"><button class="btn ghost" id="unCancel">${esc(t("cancel", "Cancel"))}</button>
+      <button class="btn primary" id="unSend">${esc(t("send", "Send report"))}</button></div>`;
+    $("#overlay").classList.add("on");
+    let kind = "streetlight";
+    $("#unsafeKinds").innerHTML = (S.unsafeKinds || []).map((k, i) =>
+      `<button class="btn sm ${i === 0 ? "cyan" : "ghost"}" data-uk="${k.id}">${k.icon} ${esc(k.label)}</button>`).join("");
+    $$("[data-uk]").forEach((b) => b.onclick = () => {
+      kind = b.dataset.uk;
+      $$("[data-uk]").forEach((x) => x.classList.remove("cyan"));
+      b.classList.add("cyan");
+    });
+    $("#unCancel").onclick = closeSheet;
+    $("#unSend").onclick = async () => {
+      const msg = $("#unMsg").value.trim();
+      if (msg.length < 4) return toast("Describe the hazard briefly");
+      const r = await post("/api/safety/unsafe", { device: S.device,
+        area: a ? a.name.split(",")[0] : "", kind, message: msg,
+        lat: a ? a.lat : null, lon: a ? a.lon : null });
+      toast(r.ok && r.receipt ? "Logged as " + (r.receipt.ref || "a receipt") + " — 72 h to fix" : "Reported");
+      closeSheet(); renderCommunity();
+    };
+  }
+
+  async function renderSafety() {
+    const box = $("#safetyBox"); if (!box) return;
+    const a = activeArea(); if (!a) return;
+    const area = a.name.split(",")[0];
+    box.innerHTML = `<div class="skeleton"></div>`;
+    try {
+      const [w, res] = await Promise.all([
+        api(`/api/safety/walks?area=${encodeURIComponent(area)}&device=${encodeURIComponent(S.device)}`),
+        api("/api/safety/resources"),
+      ]);
+      S.unsafeKinds = res.unsafe_kinds || [];
+      const top = (res.resources || []).filter((r) => r.priority <= 2);
+      const walks = w.walks || [];
+      box.innerHTML = `
+        <div class="grid2 mb8">
+          <button class="btn primary sm" id="walkBtn">🚶 ${esc("Walk with me")}</button>
+          <button class="btn sm ghost" id="unsafeBtn">🌑 ${esc("Unsafe place")}</button>
+        </div>
+        ${walks.length ? walks.map((wk) => {
+          const late = wk.overdue_by > 0;
+          const cls = wk.status === "alerted" ? "bad" : late ? "warn" : "ok";
+          return `<div class="item ${late ? "warnrow" : ""}">
+            <div class="between"><span class="t">${wk.status === "alerted" ? "🚨" : late ? "⏰" : "🚶"} ${esc(wk.handle)}</span>
+              <span class="tiny ${cls}">${late ? Math.round(wk.overdue_by) + " min overdue" : Math.round(wk.minutes_left) + " min left"}</span></div>
+            <div class="b">${esc(wk.dest || "walk")}${wk.note ? " · " + esc(wk.note) : ""}</div>
+            <div class="grid2 mt8">
+              ${wk.mine ? `<button class="btn sm primary" data-arrive="${wk.id}">✅ ${esc("I arrived")}</button>`
+                        : `<button class="btn sm ghost" data-checkwalk="${wk.id}">👋 ${esc("I'll check")}</button>`}
+              ${wk.mine || late ? `<button class="btn sm ${late ? "primary" : "ghost"}" data-alertwalk="${wk.id}">🆘 ${esc("Alert the street")}</button>` : `<span></span>`}
+            </div></div>`;
+        }).join("") : `<div class="empty" style="padding:10px">${esc("Nobody is walking right now. Start one when you leave.")}</div>`}
+        <div class="mt8">${top.map((r) => `<a class="item tapcall" href="tel:${r.tel.replace(/[^0-9*#+]/g, "")}">
+          <div class="between"><span class="t">${r.icon} ${esc(r.name)}</span><b class="num">${esc(r.tel)}</b></div>
+          <div class="b">${esc(r.detail)}</div></a>`).join("")}</div>
+        <div class="tiny mt8">${esc(res.note || "")}</div>`;
+      $("#walkBtn").onclick = openWalkSheet;
+      $("#unsafeBtn").onclick = openUnsafeSheet;
+      $$("[data-arrive]").forEach((b) => b.onclick = async () => {
+        await post("/api/safety/walk/arrive", { device: S.device, id: +b.dataset.arrive });
+        try { localStorage.removeItem("sw_walk"); } catch (e) {}
+        toast("Arrived safe ✅"); renderSafety();
+      });
+      $$("[data-alertwalk]").forEach((b) => b.onclick = async () => {
+        await post("/api/safety/walk/alert", { device: S.device, id: +b.dataset.alertwalk });
+        toast("The street has been told to check on you 🚨"); renderSafety();
+      });
+      $$("[data-checkwalk]").forEach((b) => b.onclick = async () => {
+        await post("/api/safety/walk/check", { device: S.device, id: +b.dataset.checkwalk });
+        toast("Noted — thank you for checking"); renderSafety();
+      });
+      if (w.overdue) setTimeout(() => toast(w.overdue + " neighbour(s) are late — please check 👀", 5000), 400);
+    } catch (e) {
+      box.innerHTML = `<div class="muted">Safety unavailable.</div>`;
     }
   }
 

@@ -63,6 +63,27 @@ The only service app that shows you the **rand value** of a disruption and of a 
 * food basket cost vs the food poverty line, per city
 * a **savings ledger** where users log what they avoided spending
 
+### SAFE — personal safety & GBV (`safety.py`)
+The hackathon's second problem statement is *Public Safety & Gender-Based Violence: prevent GBV,
+strengthen emergency response and trust in safety systems.* Every other entry in this space reads a
+schedule. This is about the walk home from the taxi rank.
+
+* **SafeWalk — "walk with me"** — you say where you're going and how long it should take. If you never
+  tap *I arrived*, the street is told to check on you. **No GPS trail is kept** (privacy, and it must work
+  on a R500 phone with no data): just a deadline, held on the phone as well as the server, so it still
+  fires if the network is down.
+* **SOS** — one tap from the header, always in thumb reach. Alerts the area by push, puts verified
+  national helplines under your thumb (GBV Command Centre **0800 428 428**, *120*7867# free
+  please-call-me, SAPS 10111, 112 from a mobile, 10177) and shares location rounded to ~100 m. It says
+  plainly that **it does not call the police** — that number is on the same screen, tappable.
+* **Unsafe place → repair receipt** — a dark street, a broken streetlight, an open manhole, an unlit taxi
+  rank. Reported like any other fault, so it becomes `SW-…` with a **72-hour SLA** against the municipal
+  call centre and a 🚨 pin on the map. Fixing the light is cheaper than policing the dark, and it is the
+  "trust in safety systems" half of the brief: a hazard stops being a complaint and becomes a work order.
+
+Every helpline is **curated reference data with its source cited**, verified before shipping — a wrong
+number in a GBV app is worse than no number.
+
 ### CARE — the watch circle (`watch.py`)
 Public safety is not only pipes and pylons. When the lights go at 19:00, the question that matters on a
 street is whether the gogo two doors down is alright. The watch circle lets a neighbour say "I'm safe",
@@ -164,7 +185,8 @@ See **[docs/DATA_SOURCES.md](docs/DATA_SOURCES.md)** for the full table, keys an
 | Neighbour capacity sharing | ❌ | ❌ | ✅ but invisible/unstructured | ✅ **Ubuntu Grid + stokvels** |
 | Accountability receipt + SLA | ❌ | ⚠️ reference numbers only | ❌ | ✅ **public receipts + ward scorecard** |
 | Food access & food prices | ❌ | ❌ | ❌ | ✅ basket cost, food points, gardens |
-| Works on a R500 phone / no data | ❌ app-first | ⚠️ | ✅ | ✅ **PWA + USSD + WhatsApp, offline, data-saver** |
+| Works on a R500 phone / no data | ❌ app-first | ⚠️ | ✅ | ✅ **PWA + USSD + WhatsApp, offline queue, data-saver** |
+| Personal safety / GBV | ❌ | ❌ | ⚠️ voice notes | ✅ **SafeWalk, SOS, verified helplines, hazard receipts** |
 | 11-language country | ❌ English | ⚠️ | ✅ | ✅ **5 languages shipped, 11 designed for** |
 | No login, no tracking | ✅ | ❌ | n/a | ✅ |
 
@@ -233,7 +255,7 @@ ServiceWaze/
 │   └── ARCHITECTURE.md           request flow, data tiering, design decisions
 ├── concepts/servicewaze-concept.md   original product thesis (2026)
 └── servicewaze/
-    ├── app.py                FastAPI app (87 endpoints) + PWA shell
+    ├── app.py                FastAPI app (96 endpoints) + PWA shell
     ├── net.py                tiered live-data layer + provenance + health registry
     ├── sim.py                deterministic demo data for offline operation
     ├── impact.py             ★ Prepare Window: threats, confidence, task plan

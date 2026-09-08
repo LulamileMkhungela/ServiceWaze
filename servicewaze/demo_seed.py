@@ -93,6 +93,17 @@ BUSINESSES = [
     ("Umlazi Transport Co-op", "transport", "Durban", "073 559 0028", "Bakkie delivery — water, gas, parcels across Umlazi."),
 ]
 
+UNSAFE = [
+    ("Soweto", "streetlight", "Pole 14 on Vilakazi dark for three weeks — the whole stretch is black.", 300, 7),
+    ("Soweto", "dark_passage", "Footbridge between Zone 3 and the rank has no lights.", 120, 12),
+    ("Alexandra", "open_manhole", "Open manhole on 3rd Avenue, no cover since the storm.", 54, 9),
+]
+
+WALKS = [
+    ("Soweto", "demo-nomsa", "home from the taxi rank", 20, 8, "walking"),
+    ("Soweto", "demo-thabo", "night shift at the clinic", 25, 95, "overdue"),
+]
+
 WATCH = [
     ("Soweto", "demo-thabo", "Gogo at no. 42", "Uses a walking frame — check the back door.", 6),
     ("Soweto", "demo-nomsa", "Neighbour Brave uKhozi", "Three small children.", 2),
@@ -126,7 +137,7 @@ STOKVELS = [
 
 def reset():
     # make sure every module's tables exist before we try to clean them
-    for mod in ("grid", "watch"):
+    for mod in ("grid", "watch", "safety"):
         try:
             m = __import__(mod)
             if hasattr(m, "_db"):
@@ -140,7 +151,7 @@ def reset():
                      ("neighbours", "device"), ("profile", "device"),
                      ("businesses", "device"), ("open_board", "device"),
                      ("business_verifiers", "device"), ("outcomes", "area"),
-                     ("predictions", "area"), ("checkins", "device")]:
+                     ("predictions", "area")]:
         try:
             con.execute(f"DELETE FROM {tbl} WHERE {col} LIKE 'demo-%'")
         except Exception as e:
@@ -150,6 +161,22 @@ def reset():
         con.execute("DELETE FROM reports WHERE reporter LIKE 'demo%' OR reporter LIKE 'demo-%'")
     except Exception:
         pass
+    # watch/safety live in their own databases
+    for mod, tables in (("watch", ("watch", "checkins")), ("safety", ("walks", "sos"))):
+        try:
+            m = __import__(mod)
+            wcon = sqlite3.connect(m.DB)
+            for tbl in tables:
+                try:
+                    wcon.execute(f"DELETE FROM {tbl} WHERE device LIKE 'demo-%'")
+                except Exception:
+                    try:
+                        wcon.execute(f"DELETE FROM {tbl} WHERE handle LIKE '%' AND area LIKE '%'")
+                    except Exception as e2:
+                        print("skip", tbl, e2)
+            wcon.commit(); wcon.close()
+        except Exception as e:
+            print("skip", mod, e)
     con.commit()
     con.close()
 
@@ -239,6 +266,29 @@ def seed():
         grid_mod.post_open(name, area, status, note,
                            "demo-" + ["thabo", "nomsa", "lerato"][OPEN_BOARD.index((name, area, status, note)) % 3])
 
+    # safety: hazards with receipts, and one walk that never arrived
+    try:
+        import safety
+        for area, kind, msg, hours_ago, confirms in UNSAFE:
+            rid = sources.add_report(area, "unsafe", "[" + kind + "] " + msg, "demo-neighbour",
+                                     COORDS.get(area, COORDS["Soweto"])[0],
+                                     COORDS.get(area, COORDS["Soweto"])[1])
+            con = sqlite3.connect(DB)
+            con.execute("UPDATE reports SET confirms=?, created=? WHERE id=?",
+                        (confirms, (now - timedelta(hours=hours_ago)).isoformat(timespec="seconds"), rid))
+            con.commit(); con.close()
+            receipts.issue(rid, area, "unsafe")
+        for area, dev, dest, minutes, started_ago, status in WALKS:
+            w = safety.walk_start(dev, area, dest, minutes)
+            con = sqlite3.connect(safety.DB)
+            con.execute("UPDATE walks SET started=?, due=?, status=? WHERE id=?",
+                        ((now - timedelta(minutes=started_ago)).isoformat(timespec="seconds"),
+                         (now - timedelta(minutes=started_ago - minutes)).isoformat(timespec="seconds"),
+                         status, w["id"]))
+            con.commit(); con.close()
+    except Exception as e:
+        print("skip safety", e)
+
     # the watch circle: one ok, one quiet, one that needs a knock
     try:
         import watch
@@ -266,7 +316,8 @@ def seed():
     print("  stokvels   :", len(STOKVELS))
     print("  receipts   :", len(REPORTS))
     print("  businesses :", len(BUSINESSES), "/", len(OPEN_BOARD), "open-board posts")
-    print("  watch      :", len(WATCH), "neighbours")
+    print("  watch      :", len(WATCH), "neighbours /", len(WALKS), "walks")
+    print("  safety     :", len(UNSAFE), "hazards with repair receipts")
     print("Run: uvicorn app:app --port 8000")
 
 

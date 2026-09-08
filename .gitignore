@@ -11,3 +11,9 @@ servicewaze/data/*.log
 
 # Generated previews
 servicewaze/preview*.html
+
+# local UI audit artefacts & node deps
+ui_audit/
+node_modules/
+package.json
+package-lock.json

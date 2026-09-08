@@ -28,27 +28,32 @@ DB_PATH = os.path.join(DATA_DIR, "servicewaze.db")
 SLA_HOURS = {
     "no_water": 24, "low_pressure": 24, "leak": 72, "power_out": 6,
     "route": 12, "restored": 0, "other": 48,
+    "unsafe": 72,          # streetlights and hazards: prevention, not emergency
 }
 
 ENTITY_BY_AREA = [
     (("johannesburg", "soweto", "randburg", "sandton", "joburg", "alexandra", "midrand",
       "roodepoort", "gauteng"), {
         "water": ("Johannesburg Water", "0860 562 874", "https://www.johannesburgwater.co.za"),
+        "safety": ("City of Johannesburg (municipal call centre — streetlights & public safety)", "0860 562 874", "https://www.joburg.org.za"),
         "power": ("City Power Johannesburg", "0860 562 874", "https://www.citypower.co.za"),
         "route": ("Johannesburg Roads Agency", "0860 562 874", "https://www.jra.org.za"),
     }),
     (("cape town", "khayelitsha", "stellenbosch", "paarl", "western cape"), {
         "water": ("City of Cape Town Water & Sanitation", "0860 103 089", "https://www.capetown.gov.za"),
+        "safety": ("City of Cape Town Safety & Security (streetlights & public safety)", "0860 103 089", "https://www.capetown.gov.za"),
         "power": ("City of Cape Town Electricity", "0860 103 089", "https://www.capetown.gov.za"),
         "route": ("Transport for Cape Town", "0800 656 463", "https://www.tct.gov.za"),
     }),
     (("pretoria", "tshwane", "centurion", "soshanguve"), {
         "water": ("City of Tshwane Water", "012 358 9999", "https://www.tshwane.gov.za"),
+        "safety": ("City of Tshwane Metro Police (streetlights & public safety)", "012 358 9999", "https://www.tshwane.gov.za"),
         "power": ("City of Tshwane Electricity", "012 358 9999", "https://www.tshwane.gov.za"),
         "route": ("City of Tshwane Transport", "012 358 9999", "https://www.tshwane.gov.za"),
     }),
     (("durban", "ethekwini", "umhlanga", "pietermaritzburg"), {
         "water": ("eThekwini Water", "0800 131 3013", "https://www.durban.gov.za"),
+        "safety": ("eThekwini Metro Police (streetlights & public safety)", "0800 131 3013", "https://www.durban.gov.za"),
         "power": ("eThekwini Electricity", "0800 311 1111", "https://www.durban.gov.za"),
         "route": ("eThekwini Transport Authority", "0800 131 3013", "https://www.durban.gov.za"),
     }),
@@ -57,6 +62,7 @@ ENTITY_BY_AREA = [
 SERVICE_OF_KIND = {
     "no_water": "water", "low_pressure": "water", "leak": "water", "restored": "water",
     "power_out": "power", "route": "route", "other": "water",
+    "unsafe": "safety",
 }
 
 

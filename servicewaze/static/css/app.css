@@ -379,3 +379,22 @@ html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-
 }
 .leaflet-container { background: var(--card2); font: inherit; }
 .leaflet-div-icon { background: transparent; border: 0; }
+
+/* emergency button — always within thumb reach, never hidden in a menu */
+.sosbtn {
+  border: 0; border-radius: 999px; padding: 0 12px; height: 36px; min-height: 36px;
+  background: linear-gradient(180deg, #ff5a5a, #d61f26); color: #fff;
+  font-weight: 800; font-size: 12.5px; letter-spacing: .02em; cursor: pointer;
+  box-shadow: 0 2px 10px rgba(214, 31, 38, .45);
+}
+.sosbtn:active { transform: scale(.95); }
+html[data-contrast="high"] .sosbtn { background: #b3000b; border: 2px solid #fff; }
+
+/* safety card */
+.card.safety { border-color: rgba(214, 31, 38, .35); }
+.card.safety h2 { color: #ff8a8a; }
+html[data-theme="light"] .card.safety h2 { color: #a3000a; }
+.item.warnrow { border-left: 3px solid var(--warn); }
+a.item.tapcall { display: block; text-decoration: none; color: inherit; }
+a.item.tapcall:active { transform: scale(.99); }
+.tiny.ok { color: var(--ok); } .tiny.warn { color: var(--warn); } .tiny.bad { color: var(--bad); }
