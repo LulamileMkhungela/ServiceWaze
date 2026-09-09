@@ -23,6 +23,9 @@ from datetime import datetime, timezone
 
 import requests
 
+import net  # tiered live-data layer (live → cache → demo)
+import sim  # deterministic demo data
+
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) ServiceWaze/1.0"}
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 DB_PATH = os.path.join(DATA_DIR, "servicewaze.db")
@@ -335,11 +338,12 @@ def _sa_relevant(text):
 def get_feed(areas=None, categories=None, q=None, limit=80, types=None):
     if time.time() - _last_fetch() > REFRESH_SECONDS:
         merged = []
-        merged += fetch_google_news()
-        merged += _fetch_rss("https://citizen.co.za/feed/", limit=20, label="The Citizen")
-        merged += _fetch_rss("https://businesstech.co.za/news/feed/", limit=20, label="BusinessTech")
-        merged += fetch_jw_water()          # official water notices (scrape, no API exists)
-        merged += fetch_mastodon()          # social updates (hashtags, SA-filtered)
+        if net.live_enabled():
+            merged += fetch_google_news()
+            merged += _fetch_rss("https://citizen.co.za/feed/", limit=20, label="The Citizen")
+            merged += _fetch_rss("https://businesstech.co.za/news/feed/", limit=20, label="BusinessTech")
+            merged += fetch_jw_water()      # official water notices (scrape, no API exists)
+            merged += fetch_mastodon()      # social updates (hashtags, SA-filtered)
         seen = set()
         deduped = []
         for it in merged:
@@ -351,6 +355,13 @@ def get_feed(areas=None, categories=None, q=None, limit=80, types=None):
                 continue  # keep the newsfeed strictly about what the app does (news AND social)
             it["areas"] = tag_areas(it["title"], it.get("body", ""))
             deduped.append(it)
+        if not deduped:
+            # No upstream reachable (or no on-topic item) — serve the deterministic
+            # demo feed so the product is never empty, clearly labelled as demo.
+            for it in sim.feed_items():
+                it["tier"] = "sim"
+                it["live"] = False
+                deduped.append(it)
         _cache_store(deduped, time.time())
 
     items = _cache_get()
@@ -378,33 +389,46 @@ def feed_meta():
 # Air quality (Open-Meteo, keyless) — cached 30 min
 # --------------------------------------------------------------------------
 _air_cache = {}
+
+
 def get_air(lat, lon):
     key = (round(lat, 2), round(lon, 2))
     if key in _air_cache and time.time() - _air_cache[key][0] < 1800:
         return _air_cache[key][1]
+    env = net.fetched("https://air-quality-api.open-meteo.com/v1/air-quality",
+                      "Open-Meteo Air Quality", ttl=1800,
+                      params={"latitude": lat, "longitude": lon,
+                              "current": "us_aqi,pm2_5,pm10,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide",
+                              "timezone": "Africa/Johannesburg"},
+                      headers=UA, timeout=12, sim=lambda: sim.air(lat, lon))
     try:
-        r = requests.get("https://air-quality-api.open-meteo.com/v1/air-quality",
-                         params={"latitude": lat, "longitude": lon,
-                                 "current": "us_aqi,pm2_5,pm10,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide",
-                                 "timezone": "Africa/Johannesburg"}, headers=UA, timeout=12)
-        c = r.json().get("current", {})
+        c = (env.get("data") or {}).get("current", {})
         aqi = c.get("us_aqi")
         if aqi is None:
-            return None
-        if aqi <= 50: label, band = "Good", "good"
-        elif aqi <= 100: label, band = "Moderate", "moderate"
-        elif aqi <= 150: label, band = "Unhealthy (sensitive)", "warn"
-        elif aqi <= 200: label, band = "Unhealthy", "severe"
-        else: label, band = "Very unhealthy", "severe"
+            raise ValueError("no aqi")
+        if aqi <= 50:
+            label, band = "Good", "good"
+        elif aqi <= 100:
+            label, band = "Moderate", "moderate"
+        elif aqi <= 150:
+            label, band = "Unhealthy (sensitive)", "warn"
+        elif aqi <= 200:
+            label, band = "Unhealthy", "severe"
+        else:
+            label, band = "Very unhealthy", "severe"
         out = {"aqi": aqi, "label": label, "band": band,
                "pm2_5": c.get("pm2_5"), "pm10": c.get("pm10"),
                "o3": c.get("ozone"), "no2": c.get("nitrogen_dioxide"),
                "so2": c.get("sulphur_dioxide"), "co": c.get("carbon_monoxide"),
-               "source": "Open-Meteo Air Quality"}
+               "source": env.get("source"), "tier": env.get("tier"),
+               "live": env.get("live"), "fetched_at": env.get("fetched_at")}
         _air_cache[key] = (time.time(), out)
         return out
     except Exception:
-        return None
+        out = sim.air(lat, lon)
+        out.update({"tier": "sim", "live": False})
+        return out
+
 
 # --------------------------------------------------------------------------
 # Services directory (curated, verified Aug 2026) + emergency numbers

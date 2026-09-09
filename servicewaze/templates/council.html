@@ -1,0 +1,139 @@
+{% macro pct(x) %}{{ '%.0f'|format((x or 0) * 100) }}%{% endmacro %}
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ area }} — service delivery report · ServiceWaze</title>
+<style>
+  :root{ --ink:#111827; --muted:#5b6674; --line:#dfe4ea; --bg:#f6f7f9; --card:#fff;
+         --ok:#0f8a4f; --warn:#b06d00; --bad:#c62828; --accent:#0b6b5e; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:24px 18px 60px}
+  header.top{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;justify-content:space-between;
+             border-bottom:3px solid var(--accent);padding-bottom:12px;margin-bottom:20px}
+  h1{margin:0;font-size:22px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:13px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;
+         background:#e7f4ef;color:var(--accent);border:1px solid #bfe0d7}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:14px 0 22px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .kpi .n{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+  .kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+  .kpi.bad .n{color:var(--bad)} .kpi.ok .n{color:var(--ok)} .kpi.warn .n{color:var(--warn)}
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+  h2{margin:0 0 10px;font-size:15px;letter-spacing:.01em}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+     border-bottom:1px solid var(--line);padding:6px 8px}
+  td{padding:7px 8px;border-bottom:1px solid #f0f2f5;vertical-align:top}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:0}
+  .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:800}
+  .pill.overdue{background:#fdeaea;color:var(--bad)} .pill.on_time{background:#e8f6ee;color:var(--ok)}
+  .pill.open{background:#fff5e0;color:var(--warn)} .pill.resolved{background:#eef1f5;color:var(--muted)}
+  form.areas{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  select,button{font:inherit;padding:7px 10px;border-radius:9px;border:1px solid var(--line);background:#fff}
+  button{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;cursor:pointer}
+  a.button{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;
+           padding:7px 12px;border-radius:9px;font-weight:700;font-size:13.5px}
+  footer{color:var(--muted);font-size:12.5px;line-height:1.6;border-top:1px solid var(--line);padding-top:12px}
+  .ref{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+  @media print{
+    body{background:#fff} .wrap{max-width:none;padding:0}
+    form.areas,.noprint{display:none} section{border-color:#bbb;break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Service delivery report — {{ area }}</h1>
+      <div class="sub">Generated {{ generated }} · ServiceWaze community receipts</div>
+    </div>
+    <div class="noprint">
+      <span class="badge">{{ sc.total }} tracked reports</span>
+    </div>
+  </header>
+
+  <form class="areas noprint" method="get" action="/council">
+    <label for="a" class="sub">Area</label>
+    <select id="a" name="area">
+      {% for a in areas %}<option value="{{ a.area }}" {% if a.area == area %}selected{% endif %}>{{ a.area }} ({{ a.reports }})</option>{% endfor %}
+    </select>
+    <button type="submit">Show</button>
+    <a class="button" href="/api/scorecard/export?area={{ area|urlencode }}&format=csv">Download CSV</a>
+    <a class="button" href="/">&larr; Back to the app</a>
+  </form>
+
+  <div class="kpis">
+    <div class="kpi"><div class="n">{{ sc.total }}</div><div class="l">Reported</div></div>
+    <div class="kpi warn"><div class="n">{{ sc.open }}</div><div class="l">Still open</div></div>
+    <div class="kpi ok"><div class="n">{{ sc.resolved }}</div><div class="l">Resolved</div></div>
+    <div class="kpi bad"><div class="n">{{ sc.overdue }}</div><div class="l">Past SLA</div></div>
+    <div class="kpi {% if sc.sla_compliance >= 0.7 %}ok{% else %}bad{% endif %}"><div class="n">{{ pct(sc.sla_compliance) }}</div><div class="l">SLA compliance</div></div>
+    <div class="kpi"><div class="n">{{ '%.1f'|format(sc.avg_hours or 0) }}h</div><div class="l">Avg time to first fix</div></div>
+  </div>
+
+  <section>
+    <h2>By responsible entity</h2>
+    <table>
+      <thead><tr><th>Entity</th><th class="num">Reported</th><th class="num">Resolved</th><th class="num">Past SLA</th></tr></thead>
+      <tbody>
+      {% for name, r in sc.by_entity.items() %}
+        <tr><td>{{ name }}</td><td class="num">{{ r.total }}</td><td class="num">{{ r.resolved }}</td>
+            <td class="num">{% if r.overdue %}<b>{{ r.overdue }}</b>{% else %}0{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>By type of fault</h2>
+    <table>
+      <thead><tr><th>Type</th><th class="num">Reported</th><th class="num">Resolved</th><th class="num">Past SLA</th></tr></thead>
+      <tbody>
+      {% for kind, r in sc.by_kind.items() %}
+        <tr><td>{{ kind.replace('_',' ') }}</td><td class="num">{{ r.total }}</td><td class="num">{{ r.resolved }}</td>
+            <td class="num">{% if r.overdue %}<b>{{ r.overdue }}</b>{% else %}0{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Recent receipts</h2>
+    <table>
+      <thead><tr><th>Ref</th><th>Type</th><th>Entity</th><th class="num">Elapsed</th><th class="num">SLA</th><th>State</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td class="ref">{{ r.ref }}</td>
+          <td>{{ r.kind.replace('_',' ') }}</td>
+          <td>{{ r.entity }}</td>
+          <td class="num">{{ '%.0f'|format(r.elapsed_hours or 0) }}h</td>
+          <td class="num">{{ r.sla_hours }}h</td>
+          <td><span class="pill {{ r.state }}">{{ r.state.replace('_',' ') }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    <p><b>What this is.</b> Every ServiceWaze report becomes a tracked receipt with a reference number,
+    the responsible entity, an SLA clock and a public state. Residents confirm each other's reports, so
+    the numbers below are community-verified, not call-centre self-reporting.</p>
+    <p><b>Method.</b> SLA hours by fault type: leak 72 h, no water / low pressure 24 h, power 6 h,
+    route 12 h, unsafe place 72 h, other 48 h. "Past SLA" = open and elapsed beyond the SLA.</p>
+    <p><b>Privacy.</b> Reporters are pseudonymous device identities — no names, phone numbers or
+    addresses are stored or shown. Data shown with its source; nothing is inferred or invented.</p>
+    <p class="noprint">Printable, and downloadable as CSV for a councillor, a ward committee or a
+    municipal depot.</p>
+  </footer>
+</div>
+</body>
+</html>
