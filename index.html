@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-size="md">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ServiceWaze — what is coming, what to do, what it costs</title>
+<meta name="description" content="South African household services: live weather, scraped Joburg water and City Power notices, real 2026/27 tariffs, and the number to call. No login.">
+<meta name="theme-color" content="#071018">
+<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/app.css">
+<script>
+try {
+  var saved = JSON.parse(localStorage.getItem("servicewaze.v1") || "{}");
+  var a = saved.a11y || {};
+  document.documentElement.dataset.theme = a.theme || "dark";
+  document.documentElement.dataset.size = a.size || "md";
+  if (a.contrast) document.documentElement.dataset.contrast = "1";
+  if (a.simple) document.documentElement.classList.add("simple");
+} catch (e) {}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header>
+  <div class="hrow">
+    <div class="brand">
+      <img src="assets/icons/icon-192.png" alt="" width="34" height="34">
+      <span>ServiceWaze<small>HOUSEHOLD SERVICES</small></span>
+    </div>
+    <span class="spacer"></span>
+    <span class="pill snap" id="livePill"><span class="dot"></span><span id="liveText">Loading</span></span>
+    <button class="iconbtn" id="themeBtn" type="button" aria-label="Toggle theme">Theme</button>
+    <button class="sos" id="sosBtn" type="button">SOS</button>
+  </div>
+  <div class="chips" id="chips" aria-label="Places"></div>
+</header>
+<div class="layout">
+  <nav class="side" id="side" aria-label="Sections"></nav>
+  <main id="main"></main>
+</div>
+<nav class="tabbar" id="tabbar" aria-label="Sections"></nav>
+<div id="sheetHost"></div>
+<div class="toast" id="toast" role="status"></div>
+<noscript><p style="padding:16px">ServiceWaze needs JavaScript to calculate bills and load live weather. The scraped notices are in <a href="data/snapshot.json">data/snapshot.json</a>.</p></noscript>
+<script src="assets/engine.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

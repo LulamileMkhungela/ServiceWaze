@@ -1,5 +1,9 @@
 # ServiceWaze — South Africa's household resilience network
 
+**Live app (GitHub Pages):** https://lulamilemkhungela.github.io/ServiceWaze/
+
+The page at the repository root is the installable app: scraped 24 Sep 2026 notices, live Open-Meteo weather in the browser, and the 2026/27 tariff maths. The Python service below is the full backend for anyone who wants to run it locally.
+
 > **Load-shedding ended. The service crisis didn't — it moved into water, roads, food prices and tariffs.**
 > ServiceWaze is the app that tells a household **what is coming, how long they have, what to do before it hits, who can help, what it costs, and whether anyone is going to fix it.**
 
