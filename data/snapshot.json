@@ -1,0 +1,416 @@
+{
+  "scraped_at": "2026-09-24T20:40:00Z",
+  "scraped_at_sast": "24 Sep 2026, 22:40 SAST",
+  "method": "Fetched live during the GitHub Pages build. Weather, air and radar are refreshed in the browser. Municipal notices do not allow browser CORS, so they are this scrape plus a link to the live tracker.",
+  "electricity_national": {
+    "raw": 1,
+    "stage": 0,
+    "meaning": "No load shedding",
+    "endpoint": "https://loadshedding.eskom.co.za/LoadShedding/GetStatus",
+    "decode": "Eskom returns 1 for no load shedding. Stage = value − 1.",
+    "context": "Eskom told SA News on 7 Sep 2026 it had gone about 476 days without load shedding and had completed winter 2026 without shedding. This build does not add days onto that count. Load reduction is a separate, local practice and was not finished: on 7 Sep, 7 provinces were free and about 1.22 million of 1.69 million targeted customers had been restored.",
+    "context_source": "https://www.sanews.gov.za/south-africa/eskom-carries-south-africa-through-load-shedding-free-winter"
+  },
+  "water_outages": [
+    {
+      "id": "alexandra-burst",
+      "match": ["alexandra"],
+      "severity": "bad",
+      "title": "Burst pipe — supply isolated",
+      "detail": "Unplanned interruption from a burst pipe at the corner of 14th Avenue and Florence Moposho Street. First reported Thu 24 Sep 2026 at 04:44. Johannesburg Water isolated the supply. Low pressure to no water. No restoration time was published in the notice this scrape read.",
+      "streets": ["14th Avenue", "Florence Moposho Street"],
+      "actions": [
+        "If any pressure is left, fill containers now. Once the isolation is complete the tap will not recover by itself.",
+        "Drinking water is 5 litres per person per day. Washing and cooking need about 15 more.",
+        "Call Johannesburg Water on 0860 562 874 and ask for a reference number. Email a burst to fault@jwater.co.za if the line is busy.",
+        "A City Power planned shutdown that includes Alexandra is also on the board, scheduled to end Sunday 13:00. Charge phones while you still have power."
+      ],
+      "tel": "0860562874",
+      "telLabel": "Call Johannesburg Water",
+      "source": "https://x.com/JHBWater/status/2103042833678516507",
+      "via": "OurPower reading the Johannesburg Water post, checked 24 Sep 2026",
+      "tracker": "https://www.ourpower.co.za/water-outages/jhb-water/alexandra"
+    },
+    {
+      "id": "bez-valley-quality",
+      "match": ["bezuidenhout", "bez valley", "bezuidenhout valley"],
+      "severity": "critical",
+      "title": "Do not use tap water",
+      "detail": "Johannesburg Water issued a water-quality notice for Bezuidenhout Valley after network repairs. Residents were told not to use the water for household purposes. Tankers were the alternative supply. First reported Sun 20 Sep 2026 at 02:29. Last update read in this scrape: Tue 22 Sep 10:35, which said laboratory results were expected on the morning of 23 Sep. On 24 Sep the notice was still listed as active. Streets named: Albertina Sisulu Road, 10th Avenue, 7th Avenue. Alexander Park reservoir was on bypass, so pressure may also be poor.",
+      "streets": ["Albertina Sisulu Road", "10th Avenue", "7th Avenue"],
+      "actions": [
+        "Do not drink, cook, brush teeth or mix baby formula from the tap until Johannesburg Water says the water is safe.",
+        "Boiling is not a workaround for this notice. The utility said not to use it for household purposes.",
+        "Use stored water or the tanker.",
+        "Call 0860 562 874 before you trust a neighbour's 'it's fine now'."
+      ],
+      "tel": "0860562874",
+      "telLabel": "Call Johannesburg Water",
+      "source": "https://x.com/JHBWater/status/2102406560211222592",
+      "via": "OurPower reading the Johannesburg Water notice, still listed active 24 Sep 2026",
+      "tracker": "https://www.ourpower.co.za/water-outages/jhb-water/bezuidenhout-valley"
+    }
+  ],
+  "water_rejected": [
+    {
+      "place": "Bryanston",
+      "why": "The OurPower Johannesburg index listed Bryanston among areas affected on 24 Sep 2026, but the Bryanston suburb page fetched in the same hour said reservoirs were supplying normally and there was no current water outage. Not shown as an active outage."
+    }
+  ],
+  "reservoir_strain": [
+    {"match": ["lawley"], "title": "Lawley reservoir running low", "detail": "Johannesburg Water's 23 Sep board, read by OurPower on 24 Sep: Lawley was the one reservoir marked running low. Low reservoir means weaker pressure, especially on higher ground, not automatically a dry tap.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower, JW board 23 Sep"},
+    {"match": ["doornkop"], "title": "Doornkop reservoir on bypass", "detail": "On bypass on the 23 Sep board. Pressure can dip at peak times.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["dunkeld"], "title": "Dunkeld reservoir on bypass", "detail": "On bypass on the 23 Sep board. Higher streets feel it first.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["hursthill"], "title": "Hursthill reservoirs on bypass", "detail": "Hursthill 1 and Hursthill 2 were both on bypass. Pressure may drop at peaks.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["jabulani"], "title": "Jabulani reservoir on bypass", "detail": "On bypass on the 23 Sep board.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["lenasia"], "title": "Lenasia reservoirs on bypass", "detail": "Lenasia High Level and Lenasia Hospital Hill were on bypass. Cosmos was only 'fair', which is a milder dip.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["linden"], "title": "Linden tower on bypass", "detail": "Linden 1 tower was on bypass. Linden 1 reservoir was only 'fair'.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["orange farm"], "title": "Orange Farm reservoir on bypass", "detail": "On bypass on the 23 Sep board.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["orlando"], "title": "Orlando East reservoir on bypass", "detail": "On bypass on the 23 Sep board. This is pressure risk, separate from any City Power fault.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["protea glen"], "title": "Protea Glen tower on bypass", "detail": "On bypass on the 23 Sep board.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["zondi"], "title": "Zondi tower on bypass", "detail": "On bypass on the 23 Sep board.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["forest hill"], "title": "Forest Hill tower on bypass", "detail": "On bypass on the 23 Sep board.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["aeroton"], "title": "Aeroton reservoir and tower on bypass", "detail": "Both on bypass. A City Power fault in Robertsham / Evans Park / Aeroton was reported restored about 17 hours before this scrape — power and water are different faults.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["steyn city", "dainfern"], "title": "Steyn City reservoir on bypass", "detail": "On bypass on the 23 Sep board.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["erand"], "title": "Erand tower on bypass", "detail": "On bypass. This is the Erand tower, not every Midrand suburb.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"},
+    {"match": ["president park"], "title": "President Park tower on bypass", "detail": "On bypass on the 23 Sep board.", "source": "https://www.ourpower.co.za/water-outages/jhb-water", "via": "OurPower"}
+  ],
+  "reservoir_summary": {
+    "as_of_board": "23 Sep 2026",
+    "read_on": "24 Sep 2026",
+    "running_low": 1,
+    "on_bypass": 19,
+    "fair": 37,
+    "normal": 38,
+    "tracked": 95,
+    "source": "https://www.ourpower.co.za/water-outages/jhb-water",
+    "note": "OurPower counted 20 of 95 reservoirs and towers under strain, affecting pressure for a large set of suburbs rather than confirming a dry tap in each."
+  },
+  "power_outages": [
+    {
+      "match": ["honeydew", "honey park", "honeypark", "ruimsig"],
+      "severity": "bad",
+      "title": "Power still out for part of Honeydew",
+      "detail": "Tree obstruction on overhead lines. City Power said about 80% of Honeydew and Honeypark customers were back by 15:21 on 24 Sep, with the team still on site for the rest. Ruimsig switching station was part of the job. If you are in the restored 80%, this card is stale for your house.",
+      "source": "https://x.com/CityPowerJhb/status/2103203159409577993",
+      "via": "OurPower timeline of City Power posts, 24 Sep 2026",
+      "tracker": "https://www.ourpower.co.za/power-outages/jhb-city-power"
+    },
+    {
+      "match": ["fleurhof"],
+      "severity": "bad",
+      "title": "Parts of Fleurhof still being investigated",
+      "detail": "Operators were on site at 13:43 on 24 Sep investigating an outage in parts of Fleurhof. An earlier night update said dayshift would continue because of visibility. This is not a national load-shedding slot.",
+      "source": "https://x.com/CityPowerJhb/status/2103178569904222692",
+      "via": "OurPower, 24 Sep 2026",
+      "tracker": "https://www.ourpower.co.za/power-outages/jhb-city-power/fleurhof"
+    },
+    {
+      "match": ["pennyville", "noordgesig"],
+      "severity": "warn",
+      "title": "Pennyville and Noordgesig — same-day posts disagree",
+      "detail": "A City Power post at 06:14 on 24 Sep said power was fully restored. A later active card still listed customers in Pennyville and Noordgesig as off after a trip. Treat your own lights as the fact. If they are off, call and get a reference. If they are on, the later card is the stale one.",
+      "source": "https://www.ourpower.co.za/power-outages/jhb-city-power",
+      "via": "OurPower showing both the 06:14 restoration and a later active card",
+      "tracker": "https://www.ourpower.co.za/power-outages/jhb-city-power/pennyville"
+    },
+    {
+      "match": ["florida", "robertville", "stormill", "corlett gardens", "freedom park", "gresswold", "johannesburg north", "jukskei park", "klipfontein", "lenasia ext 3", "lyndhurst", "wynberg", "ennerdale", "farmall", "houtkoppen", "kya sand", "kya sands", "nirvana", "north riding", "van beek", "maraisburg", "bree"],
+      "severity": "warn",
+      "title": "Listed on City Power's active board",
+      "detail": "OurPower's 24 Sep 2026 board listed this suburb among 20 active City Power outages (29 suburb names). This scrape did not open a separate cause line for every name. Open the tracker before you assume your street is in the fault.",
+      "source": "https://www.ourpower.co.za/power-outages/jhb-city-power",
+      "via": "OurPower suburb list, last checked about 22:00 SAST on 24 Sep 2026",
+      "tracker": "https://www.ourpower.co.za/power-outages/jhb-city-power"
+    }
+  ],
+  "power_restored": [
+    {
+      "match": ["bryanston"],
+      "title": "Bryanston power was reported restored",
+      "detail": "City Power reported Brynorth substation restored about 12 hours before this scrape. If your house is still dark, the restoration missed your block.",
+      "source": "https://x.com/CityPowerJhb/status/2103039490369450381",
+      "via": "OurPower restored list, 24 Sep 2026"
+    },
+    {
+      "match": ["risidale", "tshepisong", "robertsham", "evans park"],
+      "title": "Reported restored in the last day",
+      "detail": "On OurPower's restored list for 24 Sep. Call City Power if your lights did not come back.",
+      "source": "https://www.ourpower.co.za/power-outages/jhb-city-power",
+      "via": "OurPower"
+    }
+  ],
+  "planned_power": [
+    {
+      "match": ["alexandra", "observatory", "bellevue", "westfield", "orchard", "cydna"],
+      "title": "Planned shutdown ending Sunday 27 Sep 13:00",
+      "detail": "Sebenza substation. OurPower's table gave the scheduled end, not the start. The notice also named about 34 further areas that this scrape did not copy one by one. Confirm your street on the City Power post.",
+      "end": "2026-09-27T13:00:00+02:00",
+      "substation": "Sebenza Substation",
+      "source": "https://x.com/CityPowerJhb/status/2102407629871964315",
+      "via": "OurPower planned-outage table, 24 Sep 2026"
+    },
+    {
+      "match": ["parktown west", "hyde park"],
+      "title": "Planned shutdown ending Saturday 26 Sep 13:30",
+      "detail": "Parkhurst substation. End time only — start time was not in the scraped table.",
+      "end": "2026-09-26T13:30:00+02:00",
+      "substation": "Parkhurst Substation",
+      "source": "https://x.com/CityPowerJhb/status/2100312059896377713",
+      "via": "OurPower"
+    },
+    {
+      "match": ["homestead park", "crown gardens", "amalgam", "mayfair"],
+      "title": "Planned shutdown ending Saturday 26 Sep 13:30",
+      "detail": "Mayfair substation. Streets named included Crown No.1, Amalgam North, SABC feeds and Homestead Park. End time only.",
+      "end": "2026-09-26T13:30:00+02:00",
+      "substation": "Mayfair Substation",
+      "source": "https://x.com/CityPowerJhb/status/2100061589223158046",
+      "via": "OurPower"
+    },
+    {
+      "match": ["industria"],
+      "title": "Planned shutdown ending Saturday 26 Sep 13:00",
+      "detail": "Orlando switching station. Streets named included Nobel Street, Industria North, Bunsen Street and Slovo Crosby. End time only.",
+      "end": "2026-09-26T13:00:00+02:00",
+      "substation": "Orlando Switching Station",
+      "source": "https://x.com/CityPowerJhb/status/2100311790445809711",
+      "via": "OurPower"
+    }
+  ],
+  "news": [
+    {
+      "title": "Johannesburg Water reveals chain of failures behind Melville’s weeks-long water supply crisis",
+      "publisher": "The Citizen",
+      "published": "2026-09-22",
+      "href": "https://news.google.com/search?q=Johannesburg%20Water%20Melville%20weeks-long%20water&hl=en-ZA&gl=ZA&ceid=ZA:en"
+    },
+    {
+      "title": "Joburg shuts off Sandton meters so there’ll be water on Heritage Day",
+      "publisher": "News24",
+      "published": "2026-09-23",
+      "href": "https://news.google.com/search?q=Joburg%20shuts%20off%20Sandton%20meters%20Heritage%20Day&hl=en-ZA&gl=ZA&ceid=ZA:en",
+      "note": "Headline only. The article body was not scraped, so this app does not guess which meters or which hours."
+    },
+    {
+      "title": "Load reduction eradication programme yielding success — Eskom",
+      "publisher": "eNCA",
+      "published": "2026-09-21",
+      "href": "https://news.google.com/search?q=Load%20reduction%20eradication%20programme%20Eskom%20September%202026&hl=en-ZA&gl=ZA&ceid=ZA:en"
+    },
+    {
+      "title": "Mahlobo: criminality is the biggest obstacle to finishing water projects on time",
+      "publisher": "EWN",
+      "published": "2026-09-22",
+      "href": "https://news.google.com/search?q=Mahlobo%20criminality%20water%20projects&hl=en-ZA&gl=ZA&ceid=ZA:en"
+    },
+    {
+      "title": "GBV Command Centre calls jumped — 589 calls on 16 September, the highest day in the first half of the month",
+      "publisher": "IOL, quoting the Department of Social Development",
+      "published": "2026-09-21",
+      "href": "https://iol.co.za/news/crime-and-courts/2026-09-21-gbv-command-centre-calls-jump-21-as-fear-grows-over-womens-deaths-in-ekurhuleni/"
+    },
+    {
+      "title": "Power faults at Rand Water’s Vereeniging plant and Eikenhof pump station cut Gauteng supply on 13–14 September",
+      "publisher": "Infrastructure News",
+      "published": "2026-09-17",
+      "href": "https://infrastructurenews.co.za/2026/09/17/gauteng-water-crisis-power-outages-disrupt-rand-water/",
+      "note": "Repairs were done within hours. Rand Water said a full restart takes about 6 hours, and reservoirs take longer. This is background, not a live outage card."
+    }
+  ],
+  "utilities": {
+    "johannesburg_water": {
+      "name": "Johannesburg Water",
+      "phone": "0860 562 874",
+      "tel": "0860562874",
+      "alt": "011 688 1400",
+      "email": "fault@jwater.co.za",
+      "web": "https://www.johannesburgwater.co.za/",
+      "source": "Published on community fault pages and on OurPower's Johannesburg Water pages as the 24/7 fault line."
+    },
+    "city_power": {
+      "name": "City Power",
+      "phone": "011 490 7484",
+      "tel": "0114907484",
+      "alt": "0800 202 925",
+      "escalation": "0800 003 156",
+      "escalation_note": "Escalations only, 06:00–18:00, have a reference number ready. From the City Power account, Sep 2026.",
+      "web": "https://www.citypower.co.za/",
+      "log": "https://www.citypower.mobi/",
+      "source": "City Power public account: call centre 011 490 7484 / 0800 202 925."
+    },
+    "eskom": {
+      "name": "Eskom",
+      "phone": "0860 037 566",
+      "tel": "0860037566",
+      "web": "https://www.eskom.co.za/",
+      "source": "Eskom customer line, widely published. Use it for Eskom-direct supply, not for City Power suburbs."
+    }
+  },
+  "helplines": [
+    {"id": "gbv", "name": "GBV Command Centre", "phone": "0800 428 428", "tel": "0800428428", "detail": "24/7 social workers. Department of Social Development. Voice line confirmed operating in the 21 Sep 2026 IOL report.", "extra": "USSD please-call-me *120*7867# · SMS HELP to 31531 · Skype Helpme GBV"},
+    {"id": "saps", "name": "SAPS", "phone": "10111", "tel": "10111", "detail": "Police. ServiceWaze cannot call them for you."},
+    {"id": "mobile", "name": "Emergency from a cellphone", "phone": "112", "tel": "112", "detail": "Works from a mobile even without airtime on most networks."},
+    {"id": "ambulance", "name": "Ambulance", "phone": "10177", "tel": "10177", "detail": "National ambulance number."},
+    {"id": "childline", "name": "Childline", "phone": "116", "tel": "116", "detail": "Toll-free, for children."}
+  ],
+  "gbv_context": "The Department of Social Development told IOL that the GBV Command Centre took 589 calls on 16 Sep 2026, and about 500 a day from 13–16 Sep, against an average of 399 a day in the first 12 days of the month.",
+  "weather_snapshot": {
+    "source": "Open-Meteo forecast",
+    "endpoint": "https://api.open-meteo.com/v1/forecast",
+    "fetched_at": "2026-09-24T20:30:00Z",
+    "cities": {
+      "johannesburg": {
+        "name": "Johannesburg",
+        "lat": -26.2041,
+        "lon": 28.0473,
+        "current": {"temp": 18.4, "feels": 16.5, "humidity": 53, "wind": 10.4, "gusts": 24.5, "code": 1, "time": "2026-09-24T22:30"},
+        "daily": [
+          {"date": "09-24", "code": 3, "tmax": 25.5, "tmin": 13.8, "precip_prob": 30, "precip_sum": 0, "gusts": 34.9, "uv": 8.25, "radiation": 23.65},
+          {"date": "09-25", "code": 51, "tmax": 26.2, "tmin": 13.8, "precip_prob": 4, "precip_sum": 0.1, "gusts": 31.7, "uv": 8.3, "radiation": 23.01},
+          {"date": "09-26", "code": 51, "tmax": 25.3, "tmin": 14.2, "precip_prob": 24, "precip_sum": 0.6, "gusts": 49, "uv": 8.35, "radiation": 22.67},
+          {"date": "09-27", "code": 53, "tmax": 26.3, "tmin": 15.1, "precip_prob": 37, "precip_sum": 1.5, "gusts": 60.1, "uv": 8.45, "radiation": 22.26},
+          {"date": "09-28", "code": 3, "tmax": 26.2, "tmin": 11.4, "precip_prob": 18, "precip_sum": 0, "gusts": 42.8, "uv": 8.45, "radiation": 25.63},
+          {"date": "09-29", "code": 81, "tmax": 16.9, "tmin": 11.1, "precip_prob": 76, "precip_sum": 16.2, "gusts": 38.5, "uv": 1.45, "radiation": 11.08},
+          {"date": "09-30", "code": 80, "tmax": 16.3, "tmin": 9.6, "precip_prob": 49, "precip_sum": 11.7, "gusts": 30.6, "uv": 6.95, "radiation": 16.41}
+        ]
+      },
+      "soweto": {
+        "name": "Soweto", "lat": -26.2485, "lon": 27.854,
+        "current": {"temp": 19.1, "feels": 16.9, "humidity": 49, "wind": 11.6, "code": 2, "time": "2026-09-24T22:30"},
+        "daily": [
+          {"date": "09-24", "code": 3, "tmax": 25.7, "tmin": 13.3, "precip_prob": 37, "precip_sum": 0, "gusts": 37.8, "uv": 8.25, "radiation": 23.86},
+          {"date": "09-25", "code": 3, "tmax": 27, "tmin": 14, "precip_prob": 8, "precip_sum": 0, "gusts": 34.6, "uv": 8.25, "radiation": 23.16},
+          {"date": "09-26", "code": 80, "tmax": 25.5, "tmin": 14.8, "precip_prob": 29, "precip_sum": 2, "gusts": 49, "uv": 8.35, "radiation": 22.69},
+          {"date": "09-27", "code": 55, "tmax": 26, "tmin": 15.2, "precip_prob": 41, "precip_sum": 1.6, "gusts": 61.9, "uv": 8.45, "radiation": 22.21}
+        ]
+      },
+      "pretoria": {
+        "name": "Pretoria", "lat": -25.7479, "lon": 28.2293,
+        "current": {"temp": 19.7, "feels": 19.5, "humidity": 66, "wind": 8.5, "code": 51, "time": "2026-09-24T22:30"},
+        "daily": [
+          {"date": "09-24", "code": 51, "tmax": 29.5, "tmin": 16.9, "precip_prob": 33, "precip_sum": 0.4, "gusts": 33.1, "uv": 8.25, "radiation": 22.28},
+          {"date": "09-25", "code": 51, "tmax": 27.3, "tmin": 15.2, "precip_prob": 26, "precip_sum": 0.2, "gusts": 25.6, "uv": 8.25, "radiation": 22.28},
+          {"date": "09-26", "code": 51, "tmax": 28.3, "tmin": 15.6, "precip_prob": 6, "precip_sum": 0.3, "gusts": 41.8, "uv": 8.25, "radiation": 23.23},
+          {"date": "09-27", "code": 53, "tmax": 29.7, "tmin": 15.9, "precip_prob": 18, "precip_sum": 0.7, "gusts": 55.1, "uv": 8.35, "radiation": 22.23}
+        ]
+      },
+      "cape town": {
+        "name": "Cape Town", "lat": -33.9249, "lon": 18.4241,
+        "current": {"temp": 15.4, "feels": 16.4, "humidity": 96, "wind": 4, "code": 3, "time": "2026-09-24T22:30"},
+        "daily": [
+          {"date": "09-24", "code": 3, "tmax": 21.4, "tmin": 15.3, "precip_prob": 4, "precip_sum": 0, "gusts": 25.6, "uv": 6.15, "radiation": 17.2},
+          {"date": "09-25", "code": 3, "tmax": 18.4, "tmin": 14.6, "precip_prob": 45, "precip_sum": 0, "gusts": 40.7, "uv": 5.1, "radiation": 12.69},
+          {"date": "09-26", "code": 53, "tmax": 20.4, "tmin": 14.9, "precip_prob": 41, "precip_sum": 1.1, "gusts": 69.1, "uv": 6.6, "radiation": 15.3},
+          {"date": "09-27", "code": 51, "tmax": 16.3, "tmin": 13.6, "precip_prob": 24, "precip_sum": 0.1, "gusts": 78.8, "uv": 7.05, "radiation": 20.67}
+        ]
+      },
+      "durban": {
+        "name": "Durban", "lat": -29.8587, "lon": 31.0218,
+        "current": {"temp": 20, "feels": 23, "humidity": 97, "wind": 4.3, "code": 1, "time": "2026-09-24T22:30"},
+        "daily": [
+          {"date": "09-24", "code": 3, "tmax": 25.3, "tmin": 19.8, "precip_prob": 16, "precip_sum": 0, "gusts": 41.8, "uv": 7.1, "radiation": 18.81},
+          {"date": "09-25", "code": 3, "tmax": 25.3, "tmin": 17.6, "precip_prob": 0, "precip_sum": 0, "gusts": 38.9, "uv": 7.45, "radiation": 22.27},
+          {"date": "09-26", "code": 55, "tmax": 25.8, "tmin": 18.6, "precip_prob": 49, "precip_sum": 3.4, "gusts": 34.2, "uv": 7.4, "radiation": 19.18},
+          {"date": "09-27", "code": 53, "tmax": 24.1, "tmin": 18.1, "precip_prob": 69, "precip_sum": 2.9, "gusts": 59.8, "uv": 7.1, "radiation": 18.59}
+        ]
+      },
+      "gqeberha": {
+        "name": "Gqeberha", "lat": -33.9608, "lon": 25.6022,
+        "current": {"temp": 18.7, "feels": 18.5, "humidity": 95, "wind": 20.4, "code": 1, "time": "2026-09-24T22:30"},
+        "daily": [
+          {"date": "09-24", "code": 51, "tmax": 21.3, "tmin": 17.8, "precip_prob": 53, "precip_sum": 1.8, "gusts": 41, "uv": 6.7, "radiation": 16.68},
+          {"date": "09-25", "code": 51, "tmax": 25, "tmin": 17.4, "precip_prob": 27, "precip_sum": 0.3, "gusts": 68.4, "uv": 7.05, "radiation": 18.61},
+          {"date": "09-26", "code": 95, "tmax": 20.7, "tmin": 16.2, "precip_prob": 95, "precip_sum": 18.4, "gusts": 49.3, "uv": 2.55, "radiation": 6.27},
+          {"date": "09-27", "code": 51, "tmax": 17.9, "tmin": 14.3, "precip_prob": 63, "precip_sum": 3.3, "gusts": 72.7, "uv": 6.8, "radiation": 19.82}
+        ]
+      }
+    }
+  },
+  "air_snapshot": {
+    "source": "Open-Meteo air quality",
+    "endpoint": "https://air-quality-api.open-meteo.com/v1/air-quality",
+    "fetched_at": "2026-09-24T20:00:00Z",
+    "cities": {
+      "johannesburg": {"us_aqi": 82, "pm2_5": 28.2, "pm10": 28.5, "ozone": 66, "no2": 29.5},
+      "cape town": {"us_aqi": 138, "pm2_5": 85, "pm10": 89.9, "ozone": 17, "no2": 89},
+      "durban": {"us_aqi": 77, "pm2_5": 13.3, "pm10": 18.1, "ozone": 87, "no2": 2.4},
+      "pretoria": {"us_aqi": 89, "pm2_5": 19.7, "pm10": 19.9, "ozone": 92, "no2": 9.7}
+    }
+  },
+  "radar": {
+    "source": "RainViewer",
+    "endpoint": "https://api.rainviewer.com/public/weather-maps.json",
+    "host": "https://tilecache.rainviewer.com",
+    "latest_path": "/v2/radar/65d26e39f9df",
+    "generated": 1790282126
+  },
+  "osm": {
+    "source": "OpenStreetMap via Overpass",
+    "licence": "ODbL",
+    "fetched_at": "2026-09-24T20:39:36Z",
+    "note": "A Joburg-wide drinking-water query returned only two mapped points. Hospital nodes below are what OSM had tagged inside the bbox — tags are sometimes wrong, so phone the place. The app also queries Overpass live for your coordinates.",
+    "drinking_water": [
+      {"lat": -26.0796115, "lon": 28.0479809, "name": "Drinking water (unnamed)", "kind": "drinking_water"},
+      {"lat": -26.1489507, "lon": 28.0088442, "name": "Water well (unnamed)", "kind": "water_well"}
+    ],
+    "health": [
+      {"lat": -26.2601186, "lon": 27.9325868, "name": "Lilian Ngoyi Community Clinic", "kind": "clinic", "phone": "+27119330202", "address": "Chris Hani Road, Johannesburg 1862", "hours": "Mo–Sa 08:00–18:00", "operator": "Gauteng Department of Health"},
+      {"lat": -26.2370442, "lon": 27.9191842, "name": "Orlando Clinic", "kind": "clinic", "phone": "+27119355186", "address": "6516 Rathebe Street, Soweto", "hours": "Mo–Fr 08:00–17:00"},
+      {"lat": -26.220087, "lon": 28.1635916, "name": "Bertha Gxowa Hospital", "kind": "hospital", "phone": "+27112787600", "address": "Angus Street, Germiston South", "hours": "24/7", "emergency": true},
+      {"lat": -26.1517688, "lon": 27.919683, "name": "Life Flora Clinic", "kind": "hospital", "phone": "+27114707777", "address": "William Nicol Street North, Roodepoort", "emergency": true, "note": "Private"},
+      {"lat": -26.0294073, "lon": 28.1393846, "name": "Carstenhof Clinic", "kind": "hospital"},
+      {"lat": -26.2741169, "lon": 28.1277579, "name": "Alberton Netcare Hospital", "kind": "hospital", "note": "Private"},
+      {"lat": -26.1659728, "lon": 27.8946515, "name": "Discovery Community Health Centre", "kind": "clinic"}
+    ]
+  },
+  "places": [
+    {"name": "Alexandra", "admin1": "Gauteng", "lat": -26.105, "lon": 28.097, "metro": "joburg"},
+    {"name": "Bezuidenhout Valley", "admin1": "Gauteng", "lat": -26.192, "lon": 28.078, "metro": "joburg"},
+    {"name": "Johannesburg", "admin1": "Gauteng", "lat": -26.2041, "lon": 28.0473, "metro": "joburg"},
+    {"name": "Soweto", "admin1": "Gauteng", "lat": -26.2678, "lon": 27.8585, "metro": "joburg"},
+    {"name": "Sandton", "admin1": "Gauteng", "lat": -26.107, "lon": 28.056, "metro": "joburg"},
+    {"name": "Randburg", "admin1": "Gauteng", "lat": -26.143, "lon": 28.001, "metro": "joburg"},
+    {"name": "Roodepoort", "admin1": "Gauteng", "lat": -26.162, "lon": 27.872, "metro": "joburg"},
+    {"name": "Midrand", "admin1": "Gauteng", "lat": -25.999, "lon": 28.126, "metro": "joburg"},
+    {"name": "Honeydew", "admin1": "Gauteng", "lat": -26.079, "lon": 27.931, "metro": "joburg"},
+    {"name": "Fleurhof", "admin1": "Gauteng", "lat": -26.201, "lon": 27.907, "metro": "joburg"},
+    {"name": "Florida", "admin1": "Gauteng", "lat": -26.174, "lon": 27.923, "metro": "joburg"},
+    {"name": "Pennyville", "admin1": "Gauteng", "lat": -26.215, "lon": 27.97, "metro": "joburg"},
+    {"name": "Noordgesig", "admin1": "Gauteng", "lat": -26.218, "lon": 27.968, "metro": "joburg"},
+    {"name": "Bryanston", "admin1": "Gauteng", "lat": -26.055, "lon": 28.024, "metro": "joburg"},
+    {"name": "Melville", "admin1": "Gauteng", "lat": -26.175, "lon": 28.01, "metro": "joburg"},
+    {"name": "Hyde Park", "admin1": "Gauteng", "lat": -26.125, "lon": 28.035, "metro": "joburg"},
+    {"name": "Parktown West", "admin1": "Gauteng", "lat": -26.177, "lon": 28.028, "metro": "joburg"},
+    {"name": "Lenasia", "admin1": "Gauteng", "lat": -26.358, "lon": 27.85, "metro": "joburg"},
+    {"name": "Orange Farm", "admin1": "Gauteng", "lat": -26.478, "lon": 27.866, "metro": "joburg"},
+    {"name": "Orlando", "admin1": "Gauteng", "lat": -26.238, "lon": 27.923, "metro": "joburg"},
+    {"name": "Jabulani", "admin1": "Gauteng", "lat": -26.248, "lon": 27.858, "metro": "joburg"},
+    {"name": "Protea Glen", "admin1": "Gauteng", "lat": -26.273, "lon": 27.808, "metro": "joburg"},
+    {"name": "Doornkop", "admin1": "Gauteng", "lat": -26.228, "lon": 27.798, "metro": "joburg"},
+    {"name": "Lawley", "admin1": "Gauteng", "lat": -26.378, "lon": 27.818, "metro": "joburg"},
+    {"name": "Diepsloot", "admin1": "Gauteng", "lat": -25.933, "lon": 28.012, "metro": "joburg"},
+    {"name": "Pretoria", "admin1": "Gauteng", "lat": -25.7479, "lon": 28.2293, "metro": "tshwane"},
+    {"name": "Centurion", "admin1": "Gauteng", "lat": -25.8603, "lon": 28.1894, "metro": "tshwane"},
+    {"name": "Soshanguve", "admin1": "Gauteng", "lat": -25.5226, "lon": 28.1006, "metro": "tshwane"},
+    {"name": "Kempton Park", "admin1": "Gauteng", "lat": -26.1011, "lon": 28.2303, "metro": "ekurhuleni"},
+    {"name": "Germiston", "admin1": "Gauteng", "lat": -26.2259, "lon": 28.1708, "metro": "ekurhuleni"},
+    {"name": "Tembisa", "admin1": "Gauteng", "lat": -25.9964, "lon": 28.2268, "metro": "ekurhuleni"},
+    {"name": "Cape Town", "admin1": "Western Cape", "lat": -33.9249, "lon": 18.4241, "metro": "cape town"},
+    {"name": "Khayelitsha", "admin1": "Western Cape", "lat": -34.0403, "lon": 18.6778, "metro": "cape town"},
+    {"name": "Mitchells Plain", "admin1": "Western Cape", "lat": -34.0506, "lon": 18.6181, "metro": "cape town"},
+    {"name": "Stellenbosch", "admin1": "Western Cape", "lat": -33.9321, "lon": 18.8602, "metro": "cape town"},
+    {"name": "Durban", "admin1": "KwaZulu-Natal", "lat": -29.8587, "lon": 31.0218, "metro": "ethekwini"},
+    {"name": "Pietermaritzburg", "admin1": "KwaZulu-Natal", "lat": -29.6006, "lon": 30.3794, "metro": "ethekwini"},
+    {"name": "Gqeberha", "admin1": "Eastern Cape", "lat": -33.9608, "lon": 25.6022, "metro": "nelson mandela bay"},
+    {"name": "East London", "admin1": "Eastern Cape", "lat": -33.0153, "lon": 27.9116, "metro": "buffalo city"},
+    {"name": "Mthatha", "admin1": "Eastern Cape", "lat": -31.5889, "lon": 28.7844, "metro": "king sabata"},
+    {"name": "Bloemfontein", "admin1": "Free State", "lat": -29.0852, "lon": 26.1596, "metro": "mangaung"},
+    {"name": "Polokwane", "admin1": "Limpopo", "lat": -23.9045, "lon": 29.4689, "metro": "polokwane"},
+    {"name": "Mbombela", "admin1": "Mpumalanga", "lat": -25.4753, "lon": 30.9694, "metro": "mbombela"},
+    {"name": "Rustenburg", "admin1": "North West", "lat": -25.6676, "lon": 27.2421, "metro": "rustenburg"},
+    {"name": "Mahikeng", "admin1": "North West", "lat": -25.8652, "lon": 25.6442, "metro": "mahikeng"},
+    {"name": "Kimberley", "admin1": "Northern Cape", "lat": -28.7282, "lon": 24.7499, "metro": "sol plaatje"},
+    {"name": "Springbok", "admin1": "Northern Cape", "lat": -29.6643, "lon": 17.8865, "metro": "nama khoi"}
+  ]
+}
